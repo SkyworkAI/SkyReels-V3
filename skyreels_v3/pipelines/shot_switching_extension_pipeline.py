@@ -4,6 +4,7 @@ from typing import List, Optional, Union
 
 import numpy as np
 import torch
+import logging
 from diffusers.video_processor import VideoProcessor
 from tqdm import tqdm
 
@@ -35,7 +36,7 @@ class ShotSwitchingExtensionPipeline:
             weight_dtype: Weight data type, defaults to torch.bfloat16
         """
         load_device = "cpu" if offload else device
-        self.transformer = get_transformer(model_path, subfolder="transformer", device=load_device, weight_dtype=weight_dtype)
+        self.transformer = get_transformer(model_path, subfolder="shot_transformer", device=load_device, weight_dtype=weight_dtype)
         vae_model_path = os.path.join(model_path, "Wan2.1_VAE.pth")
         self.vae = get_vae(vae_model_path, device=device, weight_dtype=torch.float32)
         self.text_encoder = get_text_encoder(model_path, device=load_device, weight_dtype=weight_dtype)
@@ -111,7 +112,8 @@ class ShotSwitchingExtensionPipeline:
             shift=8.0,
             generator=torch.Generator(device=self.device).manual_seed(seed),
             prefix_video=prefix_video,
-        )
+        )[0]
+        logging.info(f"video_frames: {video_frames.shape}")
         return video_frames
 
     @property

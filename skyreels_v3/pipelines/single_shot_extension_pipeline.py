@@ -139,10 +139,10 @@ class SingleShotExtensionPipeline:
                 generator=torch.Generator(device=self.device).manual_seed(seed),
                 **kwargs,
             )[0]
-            if i == 0:
-                output_video_frames.append(video_frames)
-            else:
-                output_video_frames.append(video_frames[num_condition_frames:])
+            #if i == 0:
+            #    output_video_frames.append(video_frames)
+            #else:
+            output_video_frames.append(video_frames[num_condition_frames:])
             prefix_video = torch.tensor(video_frames[-num_condition_frames:]).unsqueeze(
                 0
             )
