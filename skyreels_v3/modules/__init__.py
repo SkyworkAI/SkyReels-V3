@@ -2,12 +2,16 @@ import gc
 import os
 
 import torch
+import logging
 from safetensors.torch import load_file
 
 from .clip import CLIPModel
 from .t5 import T5EncoderModel
 from .transformer import WanModel
 from .vae import WanVAE
+
+from torchao.quantization import float8_weight_only
+from torchao.quantization import quantize_
 
 
 def download_model(model_id):
@@ -18,7 +22,8 @@ def download_model(model_id):
     return model_id
 
 
-def get_vae(model_path, device="cuda", weight_dtype=torch.float32) -> WanVAE:
+def get_vae(model_path, subfolder="", device="cuda", weight_dtype=torch.float32) -> WanVAE:
+    model_path = os.path.join(model_path, subfolder) if subfolder else model_path
     vae = WanVAE(model_path).to(device).to(weight_dtype)
     vae.vae.requires_grad_(False)
     vae.vae.eval()
@@ -28,9 +33,11 @@ def get_vae(model_path, device="cuda", weight_dtype=torch.float32) -> WanVAE:
 
 
 def get_transformer(
-    model_path, subfolder="transformer", device="cuda", weight_dtype=torch.bfloat16
+    model_path, subfolder="", device="cuda", weight_dtype=torch.bfloat16
 ) -> WanModel:
-    config_path = os.path.join(model_path, subfolder, "config.json")
+    model_path = os.path.join(model_path, subfolder) if subfolder else model_path
+    config_path = os.path.join(model_path, "config.json")
+    logging.info(f"loading transformer from {config_path}, model_path: {model_path}")
     transformer = WanModel.from_config(config_path).to(weight_dtype).to(device)
 
     for file in os.listdir(model_path):
@@ -44,14 +51,17 @@ def get_transformer(
 
     transformer.requires_grad_(False)
     transformer.eval()
+    quantize_(transformer, float8_weight_only(), device="cuda")
+    transformer.to(device)
     gc.collect()
     torch.cuda.empty_cache()
     return transformer
 
 
 def get_text_encoder(
-    model_path, device="cuda", weight_dtype=torch.bfloat16
+    model_path, subfolder="", device="cuda", weight_dtype=torch.bfloat16
 ) -> T5EncoderModel:
+    model_path = os.path.join(model_path, subfolder) if subfolder else model_path
     t5_model = os.path.join(model_path, "models_t5_umt5-xxl-enc-bf16.pth")
     tokenizer_path = os.path.join(model_path, "google", "umt5-xxl")
     text_encoder = (
@@ -61,16 +71,19 @@ def get_text_encoder(
     )
     text_encoder.requires_grad_(False)
     text_encoder.eval()
+    quantize_(text_encoder, float8_weight_only(), device="cuda")
+    text_encoder.to(device)
     gc.collect()
     torch.cuda.empty_cache()
     return text_encoder
 
 
 def get_image_encoder(
-    model_path, subfolder="image_encoder", device="cuda", weight_dtype=torch.bfloat16
+    model_path, subfolder="", device="cuda", weight_dtype=torch.bfloat16
 ) -> CLIPModel:
+    model_path = os.path.join(model_path, subfolder) if subfolder else model_path
     checkpoint_path = os.path.join(
-        model_path, subfolder, "models_clip_open-clip-xlm-roberta-large-vit-huge-14.pth"
+        model_path, "models_clip_open-clip-xlm-roberta-large-vit-huge-14.pth"
     )
     tokenizer_path = os.path.join(model_path, "xlm-roberta-large")
     image_enc = CLIPModel(checkpoint_path, tokenizer_path).to(weight_dtype).to(device)

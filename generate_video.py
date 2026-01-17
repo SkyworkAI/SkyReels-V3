@@ -4,6 +4,15 @@ import os
 import random
 import time
 
+# 配置日志格式和级别，实现实时终端打印
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - skyreels_v3 - %(levelname)s - [%(filename)s:%(lineno)d - %(funcName)s] - %(message)s",
+    datefmt='%Y-%m-%d %H:%M:%S',
+    force=True,
+    handlers=[logging.StreamHandler()]  # 显式指定输出到终端
+)
+
 import imageio
 import torch
 import wget
@@ -52,12 +61,17 @@ if __name__ == "__main__":
             video_url = args.input_video
             video_name = video_url.split("/")[-1]
             video_path = os.path.join("input_video", video_name)
+            logging.info(f"downloading input video: {video_path}")
             os.makedirs(os.path.dirname(video_path), exist_ok=True)
-            wget.download(video_url, video_path)
-            args.input_video = video_path
-            assert os.path.exists(
-                args.input_video
-            ), f"Failed to download input video: {args.input_video}"
+            if os.path.exists(video_path):
+                logging.info(f"input video already exists: {video_path}")
+                args.input_video = video_path
+            else:
+                wget.download(video_url, video_path)
+                assert os.path.exists(
+                    args.input_video
+                ), f"Failed to download input video: {args.input_video}"
+                logging.info(f"finished downloading input video: {args.input_video}")
 
     logging.info(f"input params: {args}")
 
