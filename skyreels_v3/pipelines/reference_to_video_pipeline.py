@@ -755,24 +755,27 @@ class ReferenceToVideoPipeline:
         from ..utils.util import get_height_width_from_image
 
         height, width = get_height_width_from_image(ref_imgs[0], resolution)
+        height, width = 720, 1280
         ref_imgs = resize_ref_images(ref_imgs, (width, height))
         num_frames = duration * 24 + 1
         logging.info(f"height: {height}, width: {width}, num_frames: {num_frames}")
-        video_pt = self.pipeline(
-            ref_imgs=ref_imgs,
-            prompt=prompt,
-            negative_prompt="",
-            height=height,
-            width=width,
-            num_frames=num_frames,
-            guidance_scale=1.0,
-            guidance_scale_img=1.0,
-            generator=torch.Generator(device=self.device).manual_seed(seed),
-            output_type="pt",
-            start_step=0,
-            num_inference_steps=8,
-            offload=self.offload,
-        ).frames
+        kwargs = {
+            "ref_imgs": ref_imgs,
+            "prompt": prompt,
+            "negative_prompt": "",
+            "height": height,
+            "width": width,
+            "num_frames": num_frames,
+            "guidance_scale": 1.0,
+            "guidance_scale_img": 1.0,
+            "generator": torch.Generator(device=self.device).manual_seed(seed),
+            "output_type": "pt",
+            "start_step": 0,
+            "num_inference_steps": 8,
+            "offload": self.offload,
+        }
+        logging.info(f"kwargs: {kwargs}")
+        video_pt = self.pipeline(**kwargs).frames
 
         gc.collect()
         torch.cuda.empty_cache()

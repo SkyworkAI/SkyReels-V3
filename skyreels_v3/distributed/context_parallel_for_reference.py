@@ -1,5 +1,6 @@
 import functools
-from typing import Any, Dict, Optional
+import logging
+from typing import Any, Dict, Optional, Union
 
 import torch
 import torch.nn.functional as F
@@ -17,6 +18,8 @@ from xfuser.core.distributed import (
 )
 
 from ..modules.reference_to_video.transformer import WanAttnProcessor2_0
+
+logger = logging.getLogger(__name__)
 
 
 def pad_freqs(original_tensor, target_len):
@@ -135,14 +138,11 @@ def parallelize_transformer(pipe: DiffusionPipeline):
         encoder_hidden_states_image: Optional[torch.Tensor] = None,
         return_dict: bool = True,
         attention_kwargs: Optional[Dict[str, Any]] = None,
-    ):
+    ) -> Union[torch.Tensor, Dict[str, torch.Tensor]]:
         if attention_kwargs is not None:
-            # attention_kwargs = attention_kwargs.copy()
             lora_scale = attention_kwargs.pop("scale", 1.0)
-            tea_cache = attention_kwargs.get("tea_cache", None)
         else:
             lora_scale = 1.0
-            tea_cache = None
 
         if USE_PEFT_BACKEND:
             # weight the lora layers by setting `lora_scale` for each PEFT layer
@@ -152,7 +152,7 @@ def parallelize_transformer(pipe: DiffusionPipeline):
                 attention_kwargs is not None
                 and attention_kwargs.get("scale", None) is not None
             ):
-                print(
+                logger.warning(
                     "Passing `scale` via `attention_kwargs` when not using the PEFT backend is ineffective."
                 )
 
@@ -161,6 +161,7 @@ def parallelize_transformer(pipe: DiffusionPipeline):
         post_patch_num_frames = num_frames // p_t
         post_patch_height = height // p_h
         post_patch_width = width // p_w
+
         rotary_emb = self.rope(hidden_states)
 
         hidden_states = self.patch_embedding(hidden_states)
@@ -177,73 +178,54 @@ def parallelize_transformer(pipe: DiffusionPipeline):
         timestep_proj = timestep_proj.unflatten(1, (6, -1))
 
         if encoder_hidden_states_image is not None:
-            # print(encoder_hidden_states_image.size(), encoder_hidden_states.size()) (bsz, 514, 5120) (bsz. 512, 5120)
             encoder_hidden_states = torch.concat(
                 [encoder_hidden_states_image, encoder_hidden_states], dim=1
             )
 
+        # Sequence parallel: chunk tensors across ranks
         hidden_states = torch.chunk(
             hidden_states, get_classifier_free_guidance_world_size(), dim=0
         )[get_classifier_free_guidance_rank()]
         hidden_states = torch.chunk(
             hidden_states, get_sequence_parallel_world_size(), dim=-2
         )[get_sequence_parallel_rank()]
-        # print("shape rotary_emb: ", rotary_emb.shape)
-        # # rotary_emb = torch.chunk(rotary_emb,
-        # #                             get_classifier_free_guidance_world_size(),
-        # #                             dim=0)[get_classifier_free_guidance_rank()]
         rotary_emb = torch.chunk(
             rotary_emb, get_sequence_parallel_world_size(), dim=-2
         )[get_sequence_parallel_rank()]
         encoder_hidden_states = torch.chunk(
             encoder_hidden_states, get_classifier_free_guidance_world_size(), dim=0
         )[get_classifier_free_guidance_rank()]
-        # encoder_hidden_states = torch.chunk(encoder_hidden_states,
-        #                             get_sequence_parallel_world_size(),
-        #                             dim=-2)[get_sequence_parallel_rank()]
         timestep_proj = torch.chunk(
             timestep_proj, get_classifier_free_guidance_world_size(), dim=0
         )[get_classifier_free_guidance_rank()]
-
         temb = torch.chunk(temb, get_classifier_free_guidance_world_size(), dim=0)[
             get_classifier_free_guidance_rank()
         ]
 
-        if tea_cache is not None:
-            tea_cache_update = tea_cache.check(hidden_states, timestep_proj)
+        # 4. Transformer blocks
+        if torch.is_grad_enabled() and self.gradient_checkpointing:
+            for block in self.blocks:
+                hidden_states = self._gradient_checkpointing_func(
+                    block,
+                    hidden_states,
+                    encoder_hidden_states,
+                    timestep_proj,
+                    rotary_emb,
+                )
         else:
-            tea_cache_update = False
-
-        if tea_cache_update:
-            hidden_states = tea_cache.update(hidden_states)
-        else:
-            # 4. Transformer blocks
-            if torch.is_grad_enabled() and self.gradient_checkpointing:
-                for block in self.blocks:
-                    hidden_states = self._gradient_checkpointing_func(
-                        block,
-                        hidden_states,
-                        encoder_hidden_states,
-                        timestep_proj,
-                        rotary_emb,
-                    )
-            else:
-                for block in self.blocks:
-                    hidden_states = block(
-                        hidden_states, encoder_hidden_states, timestep_proj, rotary_emb
-                    )
-            if tea_cache is not None:
-                tea_cache.store(hidden_states)
+            for block in self.blocks:
+                hidden_states = block(
+                    hidden_states, encoder_hidden_states, timestep_proj, rotary_emb
+                )
 
         # 5. Output norm, projection & unpatchify
-        shift, scale = (self.scale_shift_table.cuda() + temb.unsqueeze(1)).chunk(
-            2, dim=1
-        )
+        shift, scale = (self.scale_shift_table.cuda() + temb.unsqueeze(1)).chunk(2, dim=1)
         hidden_states = (
             self.norm_out(hidden_states.float()) * (1 + scale) + shift
         ).type_as(hidden_states)
         hidden_states = self.proj_out(hidden_states)
 
+        # Sequence parallel: all_gather to restore full tensor
         hidden_states = get_sp_group().all_gather(hidden_states, dim=-2)
         hidden_states = get_cfg_group().all_gather(hidden_states, dim=0)
 
@@ -273,3 +255,4 @@ def parallelize_transformer(pipe: DiffusionPipeline):
     transformer.forward = new_forward
     for block in transformer.blocks:
         block.attn1.processor = xFuserWanAttnProcessor2_0()
+
