@@ -27,15 +27,21 @@ We also provide API access to this model. You can integrate and use the SkyReels
 <table>
   <tr>
     <td align="center" width="33%">
-      <video src="https://www.skyreels.ai/videos/ReferencetoVideo/1.mp4" width="320" height="180" controls></video>
+      <a href="https://www.skyreels.ai/videos/ReferencetoVideo/1.mp4">
+        <img src="assets/ref_to_video.gif" width="100%" alt="Reference to Video">
+      </a>
       <br><b>Reference to Video</b>
     </td>
     <td align="center" width="33%">
-      <video src="https://www.skyreels.ai/videos/VideoExtension/1.mp4" width="320" height="180" controls></video>
+      <a href="https://www.skyreels.ai/videos/VideoExtension/1.mp4">
+        <img src="assets/video_ext.gif" width="100%" alt="Video Extension">
+      </a>
       <br><b>Video Extension</b>
     </td>
     <td align="center" width="33%">
-      <video src="https://www.skyreels.ai/videos/TalkingAvatar/1.mp4" width="320" height="180" controls></video>
+      <a href="https://www.skyreels.ai/videos/TalkingAvatar/1.mp4">
+        <img src="assets/talking_avatar.gif" width="100%" alt="Talking Avatar">
+      </a>
       <br><b>Talking Avatar</b>
     </td>
   </tr>
