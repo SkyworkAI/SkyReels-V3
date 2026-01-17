@@ -8,26 +8,32 @@ import time
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - skyreels_v3 - %(levelname)s - [%(filename)s:%(lineno)d - %(funcName)s] - %(message)s",
-    datefmt='%Y-%m-%d %H:%M:%S',
+    datefmt="%Y-%m-%d %H:%M:%S",
     force=True,
-    handlers=[logging.StreamHandler()]  # 显式指定输出到终端
+    handlers=[logging.StreamHandler()],  # 显式指定输出到终端
 )
+
+import subprocess
 
 import imageio
 import torch
 import wget
+
+from skyreels_v3.configs import WAN_CONFIGS
 from skyreels_v3.modules import download_model
 from skyreels_v3.pipelines import (
+    Audio2VideoSinglePipeline,
     ShotSwitchingExtensionPipeline,
     SingleShotExtensionPipeline,
 )
+from skyreels_v3.utils.a2v_preprocess import preprocess_audio
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--task_type",
         type=str,
-        choices=["single_shot_extension", "shot_switching_extension"],
+        choices=["single_shot_extension", "shot_switching_extension", "audio2video_single"],
     )
     parser.add_argument("--model_id", type=str, default="video_extension_model")
     parser.add_argument("--duration", type=int, default=5)
@@ -39,18 +45,28 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--use_usp", action="store_true")
     parser.add_argument("--offload", action="store_true")
+    parser.add_argument("--quant", action="store_true")
     parser.add_argument(
         "--input_video",
         type=str,
         default="https://skyreels-api.oss-accelerate.aliyuncs.com/examples/video_extension/test.mp4",
     )
+    # audio2video parameters
+    parser.add_argument(
+        "--input_image",
+        type=str,
+        default="https://skyreels-api.oss-accelerate.aliyuncs.com/examples/talking_avatar_video/single1.png",
+    )
+    parser.add_argument(
+        "--input_audio",
+        type=str,
+        default="https://skyreels-api.oss-accelerate.aliyuncs.com/examples/talking_avatar_video/single_actor/huahai_5s.mp3",
+    )
 
     args = parser.parse_args()
 
     args.model_id = download_model(args.model_id)
-    assert (args.use_usp and args.seed is not None) or (
-        not args.use_usp
-    ), "usp mode need seed"
+    assert (args.use_usp and args.seed is not None) or (not args.use_usp), "usp mode need seed"
     if args.seed is None:
         random.seed(time.time())
         args.seed = int(random.randrange(4294967294))
@@ -68,10 +84,36 @@ if __name__ == "__main__":
                 args.input_video = video_path
             else:
                 wget.download(video_url, video_path)
-                assert os.path.exists(
-                    args.input_video
-                ), f"Failed to download input video: {args.input_video}"
+                assert os.path.exists(args.input_video), f"Failed to download input video: {args.input_video}"
                 logging.info(f"finished downloading input video: {args.input_video}")
+
+    if args.task_type == "audio2video_single":
+        if not os.path.exists(args.input_audio):
+            audio_url = args.input_audio
+            audio_name = audio_url.split("/")[-1]
+            audio_path = os.path.join("input_audio", audio_name)
+            logging.info(f"downloading input audio: {audio_path}")
+            os.makedirs(os.path.dirname(audio_path), exist_ok=True)
+            if os.path.exists(audio_path):
+                logging.info(f"input audio already exists: {audio_path}")
+                args.input_audio = audio_path
+            else:
+                wget.download(audio_url, audio_path)
+                assert os.path.exists(args.input_audio), f"Failed to download input audio: {args.input_audio}"
+                logging.info(f"finished downloading input audio: {args.input_audio}")
+        if not os.path.exists(args.input_image):
+            image_url = args.input_image
+            image_name = image_url.split("/")[-1]
+            image_path = os.path.join("input_image", image_name)
+            logging.info(f"downloading input image: {image_path}")
+            os.makedirs(os.path.dirname(image_path), exist_ok=True)
+            if os.path.exists(image_path):
+                logging.info(f"input image already exists: {image_path}")
+                args.input_image = image_path
+            else:
+                wget.download(image_url, image_path)
+                assert os.path.exists(args.input_image), f"Failed to download input image: {args.input_image}"
+                logging.info(f"finished downloading input image: {args.input_image}")
 
     logging.info(f"input params: {args}")
 
@@ -88,9 +130,7 @@ if __name__ == "__main__":
         local_rank = dist.get_rank()
         torch.cuda.set_device(dist.get_rank())
 
-        init_distributed_environment(
-            rank=dist.get_rank(), world_size=dist.get_world_size()
-        )
+        init_distributed_environment(rank=dist.get_rank(), world_size=dist.get_world_size())
 
         initialize_model_parallel(
             sequence_parallel_degree=dist.get_world_size(),
@@ -102,19 +142,42 @@ if __name__ == "__main__":
 
     # init pipeline
     if args.task_type == "single_shot_extension":
-        pipe = SingleShotExtensionPipeline(
-            model_path=args.model_id, use_usp=args.use_usp, offload=args.offload
-        )
-        video_out = pipe.extend_video(
-            args.input_video, args.prompt, args.duration, args.seed
-        )
+        pipe = SingleShotExtensionPipeline(model_path=args.model_id, use_usp=args.use_usp, offload=args.offload)
+        video_out = pipe.extend_video(args.input_video, args.prompt, args.duration, args.seed)
     elif args.task_type == "shot_switching_extension":
-        pipe = ShotSwitchingExtensionPipeline(
-            model_path=args.model_id, use_usp=args.use_usp, offload=args.offload
+        pipe = ShotSwitchingExtensionPipeline(model_path=args.model_id, use_usp=args.use_usp, offload=args.offload)
+        video_out = pipe.extend_video(args.input_video, args.prompt, args.duration, args.seed)
+    elif args.task_type == "audio2video_single":
+        config = WAN_CONFIGS["multitalk-14B"]
+        pipe = Audio2VideoSinglePipeline(
+            config=config,
+            model_path=args.model_id,
+            device_id=local_rank,
+            rank=local_rank,
+            use_usp=args.use_usp,
+            offload=args.offload,
+            quant=args.quant,
         )
-        video_out = pipe.extend_video(
-            args.input_video, args.prompt, args.duration, args.seed
-        )
+        input_data = {
+            "prompt": args.prompt,
+            "cond_image": args.input_image,
+            "cond_audio": {"person1": args.input_audio},
+        }
+        input_data, _ = preprocess_audio(args.model_id, input_data, "processed_audio")
+        kwargs = {
+            "input_data": input_data,
+            "size_buckget": "multitalk-720",
+            "motion_frame": 5,
+            "frame_num": 81,
+            "drop_frame": 12,
+            "shift": 11,
+            "text_guide_scale": 1.0,
+            "audio_guide_scale": 1.0,
+            "seed": args.seed,
+            "sampling_steps": 4,
+            "max_frames_num": 5000,
+        }
+        video_out = pipe.generate(**kwargs)
     else:
         raise ValueError(f"Invalid task type: {args.task_type}")
 
@@ -123,9 +186,7 @@ if __name__ == "__main__":
 
     if local_rank == 0:
         current_time = time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime())
-        video_out_file = (
-            f"{args.prompt[:100].replace('/','')}_{args.seed}_{current_time}.mp4"
-        )
+        video_out_file = f"{args.prompt[:100].replace('/','')}_{args.seed}_{current_time}.mp4"
         output_path = os.path.join(save_dir, video_out_file)
         imageio.mimwrite(
             output_path,
@@ -134,3 +195,31 @@ if __name__ == "__main__":
             quality=8,
             output_params=["-loglevel", "error"],
         )
+        if args.task_type == "audio2video_single":
+            video_with_audio_path = video_out_file.replace(".mp4", "_with_audio.mp4")
+            audio_path = kwargs["input_data"]["video_audio"]
+            # fmt: off
+            cmd = [
+                'ffmpeg',
+                '-y',
+                '-i', f'"{video_out_file}"',
+                '-i', f'"{audio_path}"',
+                '-map', '0:v',
+                '-map', '1:a',
+                '-c:v', 'copy',
+                '-shortest',
+                f'"{video_with_audio_path}"'
+            ]
+            # fmt: on
+
+            try:
+                subprocess.run(
+                    " ".join(cmd),
+                    shell=True,
+                    check=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                )
+                print(f"Video with audio generated successfully: {video_with_audio_path}")
+            except subprocess.CalledProcessError as e:
+                print(f"Error occurred: {e}")
