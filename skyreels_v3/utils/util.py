@@ -1,6 +1,8 @@
 import av
 import numpy as np
 import torch
+from PIL import Image
+
 from ..config import ASPECT_RATIO_CONFIG
 
 
@@ -22,6 +24,17 @@ def get_closest_ratio(height: float, width: float, ratios: dict):
         ratios.keys(), key=lambda ratio: abs(float(ratio) - aspect_ratio)
     )
     return closest_ratio
+
+
+def get_height_width_from_image(image: Image.Image, resolution: str = "720P"):
+    assert resolution in ASPECT_RATIO_CONFIG, f"Resolution {resolution} not supported"
+    aspect_ratio = ASPECT_RATIO_CONFIG[resolution]
+    width, height = image.size
+    closest_ratio = get_closest_ratio(height, width, aspect_ratio)
+    height, width = aspect_ratio[closest_ratio]
+    height = height // 8 // 2 * 2 * 8
+    width = width // 8 // 2 * 2 * 8
+    return height, width
 
 
 def process_video(prefix_video, raw_video, ASPECT_RATIO):

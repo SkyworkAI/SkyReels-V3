@@ -1,10 +1,10 @@
 import gc
+import logging
 import os
 from typing import List, Optional, Union
 
 import numpy as np
 import torch
-import logging
 from diffusers.video_processor import VideoProcessor
 from tqdm import tqdm
 
@@ -36,10 +36,17 @@ class ShotSwitchingExtensionPipeline:
             weight_dtype: Weight data type, defaults to torch.bfloat16
         """
         load_device = "cpu" if offload else device
-        self.transformer = get_transformer(model_path, subfolder="shot_transformer", device=load_device, weight_dtype=weight_dtype)
+        self.transformer = get_transformer(
+            model_path,
+            subfolder="shot_transformer",
+            device=load_device,
+            weight_dtype=weight_dtype,
+        )
         vae_model_path = os.path.join(model_path, "Wan2.1_VAE.pth")
         self.vae = get_vae(vae_model_path, device=device, weight_dtype=torch.float32)
-        self.text_encoder = get_text_encoder(model_path, device=load_device, weight_dtype=weight_dtype)
+        self.text_encoder = get_text_encoder(
+            model_path, device=load_device, weight_dtype=weight_dtype
+        )
         self.video_processor = VideoProcessor(vae_scale_factor=16)
         self.device = device
         self.offload = offload
@@ -50,7 +57,7 @@ class ShotSwitchingExtensionPipeline:
 
             from xfuser.core.distributed import get_sequence_parallel_world_size
 
-            from ..distributed.xdit_context_parallel import (
+            from ..distributed.context_parallel_for_extension import (
                 usp_attn_forward,
                 usp_dit_forward,
             )
