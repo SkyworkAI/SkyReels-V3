@@ -63,7 +63,7 @@ if __name__ == "__main__":
     assert (args.use_usp and args.seed is not None) or (
         not args.use_usp
     ), "usp mode need seed"
-    if args.seed <= 0:
+    if args.seed <= 0 and not args.use_usp:
         random.seed(time.time())
         args.seed = int(random.randrange(4294967294))
 
