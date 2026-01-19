@@ -5,7 +5,6 @@ import os
 import random
 import types
 from contextlib import contextmanager
-from safetensors.torch import load_file
 from functools import partial
 from typing import Dict
 
@@ -16,6 +15,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.transforms as transforms
 from PIL import Image
+from safetensors.torch import load_file
 from torchao.quantization import float8_weight_only, quantize_
 from tqdm import tqdm
 
@@ -131,12 +131,16 @@ class Audio2VideoSinglePipeline:
         self.num_train_timesteps = config.num_train_timesteps
         self.param_dtype = config.param_dtype
 
-        self.text_encoder = T5EncoderModel(
-            text_len=config.text_len,
-            checkpoint_path=os.path.join(model_path, config.t5_checkpoint),
-            tokenizer_path=os.path.join(model_path, config.t5_tokenizer),
-            shard_fn=None,
-        ).to(config.t5_dtype).to("cpu")
+        self.text_encoder = (
+            T5EncoderModel(
+                text_len=config.text_len,
+                checkpoint_path=os.path.join(model_path, config.t5_checkpoint),
+                tokenizer_path=os.path.join(model_path, config.t5_tokenizer),
+                shard_fn=None,
+            )
+            .to(config.t5_dtype)
+            .to("cpu")
+        )
         if quant:
             quantize_(self.text_encoder, float8_weight_only(), device="cuda")
 
@@ -159,7 +163,6 @@ class Audio2VideoSinglePipeline:
             checkpoint_dir=model_path,
             quant=quant,
         )["model"]
-        self.model.disable_teacache()
 
         if use_usp:
             from xfuser.core.distributed import get_sequence_parallel_world_size
@@ -291,7 +294,7 @@ class Audio2VideoSinglePipeline:
         if self.offload:
             self.text_encoder.to(self.device)
         context, context_null, connection_embedding = self.text_encoder.encode(
-            [input_prompt, n_prompt, connection_prompt], 
+            [input_prompt, n_prompt, connection_prompt],
         )
         if self.offload:
             self.text_encoder.to("cpu")
@@ -379,9 +382,7 @@ class Audio2VideoSinglePipeline:
             if self.offload:
                 self.clip.model.to(self.device)
             # get clip embedding
-            clip_context = self.clip.visual(cond_image[:, :, :1, :, :]).to(
-                self.param_dtype
-            )
+            clip_context = self.clip.visual(cond_image[:, :, :1, :, :]).to(self.param_dtype)
             if self.offload:
                 self.clip.model.to("cpu")
                 torch.cuda.empty_cache()
@@ -667,9 +668,7 @@ class Audio2VideoSinglePipeline:
                     )
                     if self.offload:
                         self.clip.model.to(self.device)
-                    clip_context = self.clip.visual(cond_image[:, :, :1, :, :]).to(
-                        self.param_dtype
-                    ) 
+                    clip_context = self.clip.visual(cond_image[:, :, :1, :, :]).to(self.param_dtype)
                     if self.offload:
                         self.clip.model.to("cpu")
                         torch.cuda.empty_cache()
@@ -685,9 +684,7 @@ class Audio2VideoSinglePipeline:
 
                     y = self.vae.encode(padding_frames_pixels_values).to(self.param_dtype)
                     cur_motion_frames_latent_num = int(1 + (cur_motion_frames_num - 1) // 4)
-                    latent_motion_frames = y[:, :, :cur_motion_frames_latent_num][
-                        0
-                    ]  # C T H W 
+                    latent_motion_frames = y[:, :, :cur_motion_frames_latent_num][0]  # C T H W
                     y = torch.concat([msk, y], dim=1)  # B 4+C T H W
                     del video_frames, padding_frames_pixels_values
 
@@ -918,11 +915,7 @@ class Audio2VideoSinglePipeline:
             gen_video_samples = gen_video_samples[:, :, :video_length_real]
             print(f"gen_video_samples: {gen_video_samples.size()}")
             gen_video_samples = (
-                gen_video_samples[0]  # (C, T, H, W)
-                .permute(1, 2, 3, 0)  # (T, H, W, C)
-                .contiguous()
-                .cpu()
-                .numpy()
+                gen_video_samples[0].permute(1, 2, 3, 0).contiguous().cpu().numpy()  # (C, T, H, W)  # (T, H, W, C)
             )
 
         if dist.is_initialized():

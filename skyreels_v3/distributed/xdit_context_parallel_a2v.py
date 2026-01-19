@@ -55,8 +55,6 @@ def usp_dit_forward_multitalk(
     y=None,
     audio=None,
     ref_target_masks=None,
-    # Camera control parameters
-    controlnet_residuals=None,
     # MultiTalk model parameters
     audio_mask=None,
 ):
@@ -161,26 +159,6 @@ def usp_dit_forward_multitalk(
         token_ref_target_masks = token_ref_target_masks.view(token_ref_target_masks.shape[0], -1)
         token_ref_target_masks = token_ref_target_masks.to(x.dtype)
 
-    if self.enable_teacache:
-        modulated_inp = e0 if self.use_ret_steps else e
-        rank = self.cnt % self.dit_repeat
-        if self.cnt < self.ret_steps or self.cnt >= self.cutoff_steps:
-            should_calc_cond = True
-            self.accumulated_rel_l1_distance_list[rank] = 0
-        else:
-            rescale_func = np.poly1d(self.coefficients)
-            self.accumulated_rel_l1_distance_list[rank] += rescale_func(
-                ((modulated_inp - self.previous_e0_list[rank]).abs().mean() / self.previous_e0_list[rank].abs().mean())
-                .cpu()
-                .item()
-            )
-            if self.accumulated_rel_l1_distance_list[rank] < self.teacache_thresh:
-                should_calc_cond = False
-            else:
-                should_calc_cond = True
-                self.accumulated_rel_l1_distance_list[rank] = 0
-        self.previous_e0_list[rank] = modulated_inp.clone()
-
     # Context Parallel
     x = torch.chunk(x, get_sequence_parallel_world_size(), dim=1)[get_sequence_parallel_rank()]
 
@@ -202,15 +180,8 @@ def usp_dit_forward_multitalk(
         audio_mask=audio_mask,
     )
 
-    if self.enable_teacache:
-        if not should_calc_cond:
-            x += self.previous_residual[rank]
-        else:
-            ori_x = x.clone()
-            x = self._apply_blocks_with_controlnet(x, controlnet_residuals, **kwargs)
-            self.previous_residual[rank] = x - ori_x
-    else:
-        x = self._apply_blocks_with_controlnet(x, controlnet_residuals, **kwargs)
+    for block in self.blocks:
+        x = block(x, **kwargs)
 
     # head
     x = self.head(x, e)
@@ -220,10 +191,6 @@ def usp_dit_forward_multitalk(
 
     # unpatchify
     x = self.unpatchify(x, grid_sizes)
-    if self.enable_teacache:
-        self.cnt += 1
-        if self.cnt >= self.num_steps:
-            self.cnt = 0
 
     return torch.stack(x)
 

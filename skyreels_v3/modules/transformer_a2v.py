@@ -208,21 +208,14 @@ class SingleStreamAttention(nn.Module):
         if self.qk_norm:
             encoder_k = self.add_k_norm(encoder_k)
 
-        # q = rearrange(q, "B H M K -> B M H K")
-        # encoder_k = rearrange(encoder_k, "B H M K -> B M H K")
-        # encoder_v = rearrange(encoder_v, "B H M K -> B M H K")
-        # x = attention(q, encoder_k, encoder_v)
         x = flash_attention(q, encoder_k, encoder_v)
-        # x = rearrange(x, "B M H K -> B H M K")
         # linear transform
         x_output_shape = (B, N, C)
-        # x = x.transpose(1, 2)
         x = x.reshape(x_output_shape)
         x = self.proj(x)
         x = self.proj_drop(x)
 
         if not enable_sp:
-            # reshape x to origin shape
             x = rearrange(x, "(B N_t) S C -> B (N_t S) C", N_t=N_t)
 
         return x
@@ -347,7 +340,6 @@ class SingleStreamMutiAttention(SingleStreamAttention):
         q = q.permute(0, 2, 1, 3)
         encoder_k = encoder_k.permute(0, 2, 1, 3)
         encoder_v = encoder_v.permute(0, 2, 1, 3)
-        # x = attention(q, encoder_k, encoder_v)
         x = flash_attention(q, encoder_k, encoder_v)
         # x = rearrange(x, "B M H K -> B H M K")
 
@@ -498,7 +490,6 @@ class WanAttentionBlock(nn.Module):
         )
         self.norm_x = WanLayerNorm(dim, eps, elementwise_affine=True) if norm_input_visual else nn.Identity()
 
-    # @torch.compile(dynamic=True)
     def forward(
         self,
         x,
@@ -516,10 +507,6 @@ class WanAttentionBlock(nn.Module):
     ):
 
         dtype = x.dtype
-        # assert e.dtype == torch.float32
-        # with amp.autocast(dtype=torch.float32):
-        #    e = (self.modulation.to(e.device) + e).chunk(6, dim=1)
-        # assert e[0].dtype == torch.float32
         e = (self.modulation + e).chunk(6, dim=1)
 
         # self-attention
@@ -531,7 +518,6 @@ class WanAttentionBlock(nn.Module):
             ref_target_masks=ref_target_masks,
             human_num=human_num,
         )
-        # with amp.autocast(dtype=torch.float32):
         x = x + y * e[2]
 
         x = x.to(dtype)
@@ -555,7 +541,6 @@ class WanAttentionBlock(nn.Module):
         x = x + x_a
 
         y = self.ffn((self.norm2(x) * (1 + e[4]) + e[3]))
-        # with amp.autocast(dtype=torch.float32):
         x = x + y * e[5]
 
         x = x.to(dtype)
@@ -586,8 +571,6 @@ class Head(nn.Module):
             x(Tensor): Shape [B, L1, C]
             e(Tensor): Shape [B, C]
         """
-        # assert e.dtype == torch.float32
-        # with amp.autocast(dtype=torch.float32):
         e = (self.modulation.to(e.device) + e.unsqueeze(1)).chunk(2, dim=1)
         x = self.head(self.norm(x) * (1 + e[1]) + e[0])
         return x
@@ -791,70 +774,6 @@ class WanModel(ModelMixin, ConfigMixin):
 
         # initialize weights
         self.init_weights()
-
-    def teacache_init(
-        self,
-        use_ret_steps=True,
-        teacache_thresh=0.2,
-        sample_steps=40,
-        model_scale="multitalk-480",
-        dit_repeat=3,
-    ):
-        print(f"teacache_init, dit_repeat:{dit_repeat}")
-        self.enable_teacache = True
-
-        self.__class__.cnt = 0
-        self.__class__.num_steps = sample_steps * 3
-        self.__class__.teacache_thresh = teacache_thresh
-        self.__class__.use_ret_steps = use_ret_steps
-
-        self.dit_repeat = dit_repeat
-        self.__class__.accumulated_rel_l1_distance_list = [0] * dit_repeat
-        self.__class__.previous_e0_list = [None] * dit_repeat
-        self.__class__.previous_residual = [None] * dit_repeat
-        # self.__class__.accumulated_rel_l1_distance_even = 0
-        # self.__class__.accumulated_rel_l1_distance_odd = 0
-        # self.__class__.previous_e0_even = None
-        # self.__class__.previous_e0_odd = None
-        # self.__class__.previous_residual_even = None
-        # self.__class__.previous_residual_odd = None
-
-        if use_ret_steps:
-            if model_scale == "multitalk-480":
-                self.__class__.coefficients = [
-                    2.57151496e05,
-                    -3.54229917e04,
-                    1.40286849e03,
-                    -1.35890334e01,
-                    1.32517977e-01,
-                ]
-            if model_scale == "multitalk-720":
-                self.__class__.coefficients = [
-                    8.10705460e03,
-                    2.13393892e03,
-                    -3.72934672e02,
-                    1.66203073e01,
-                    -4.17769401e-02,
-                ]
-            self.__class__.ret_steps = 5 * dit_repeat
-            self.__class__.cutoff_steps = sample_steps * dit_repeat
-        else:
-            if model_scale == "multitalk-480":
-                self.__class__.coefficients = [
-                    -3.02331670e02,
-                    2.23948934e02,
-                    -5.25463970e01,
-                    5.87348440e00,
-                    -2.01973289e-01,
-                ]
-
-            if model_scale == "multitalk-720":
-                self.__class__.coefficients = [-114.36346466, 65.26524496, -18.82220707, 4.91518089, -0.23412683]
-            self.__class__.ret_steps = 1 * dit_repeat
-            self.__class__.cutoff_steps = sample_steps * dit_repeat - dit_repeat
-        print("teacache_init done")
-
-    def disable_teacache(self):
         self.enable_teacache = False
 
     def forward(
@@ -867,8 +786,6 @@ class WanModel(ModelMixin, ConfigMixin):
         y=None,
         audio=None,
         ref_target_masks=None,
-        # Camera control parameters
-        controlnet_residuals=None,
         # MultiTalk model parameters
         audio_mask=None,
     ):
@@ -935,29 +852,6 @@ class WanModel(ModelMixin, ConfigMixin):
             token_ref_target_masks = token_ref_target_masks.view(token_ref_target_masks.shape[0], -1)
             token_ref_target_masks = token_ref_target_masks.to(x.dtype)
 
-        if self.enable_teacache:
-            modulated_inp = e0 if self.use_ret_steps else e
-            rank = self.cnt % self.dit_repeat
-            if self.cnt < self.ret_steps or self.cnt >= self.cutoff_steps:
-                should_calc_cond = True
-                self.accumulated_rel_l1_distance_list[rank] = 0
-            else:
-                rescale_func = np.poly1d(self.coefficients)
-                self.accumulated_rel_l1_distance_list[rank] += rescale_func(
-                    (
-                        (modulated_inp - self.previous_e0_list[rank]).abs().mean()
-                        / self.previous_e0_list[rank].abs().mean()
-                    )
-                    .cpu()
-                    .item()
-                )
-                if self.accumulated_rel_l1_distance_list[rank] < self.teacache_thresh:
-                    should_calc_cond = False
-                else:
-                    should_calc_cond = True
-                    self.accumulated_rel_l1_distance_list[rank] = 0
-            self.previous_e0_list[rank] = modulated_inp.clone()
-
         # arguments
         kwargs = dict(
             e=e0,
@@ -972,42 +866,16 @@ class WanModel(ModelMixin, ConfigMixin):
             audio_mask=audio_mask,
         )
 
-        if self.enable_teacache:
-            if not should_calc_cond:
-                x += self.previous_residual[rank]
-            else:
-                ori_x = x.clone()
-                x = self._apply_blocks_with_controlnet(x, controlnet_residuals, **kwargs)
-                self.previous_residual[rank] = x - ori_x
-        else:
-            x = self._apply_blocks_with_controlnet(x, controlnet_residuals, **kwargs)
+        for block in self.blocks:
+            x = block(x, **kwargs)
 
         # head
         x = self.head(x, e)
 
         # unpatchify
         x = self.unpatchify(x, grid_sizes)
-        if self.enable_teacache:
-            self.cnt += 1
-            if self.cnt >= self.num_steps:
-                self.cnt = 0
 
         return torch.stack(x)
-
-    def _apply_blocks_with_controlnet(self, x, controlnet_residuals, **kwargs):
-        """Apply transformer blocks with optional controlnet residuals"""
-        if controlnet_residuals is not None and len(controlnet_residuals) > 0:
-            # Apply blocks with controlnet residuals
-            for i, block in enumerate(self.blocks):
-                x = block(x, **kwargs)
-                # Add controlnet residuals if available for this layer
-                if i < len(controlnet_residuals):
-                    x = x + controlnet_residuals[i]
-        else:
-            # Standard forward pass without controlnet
-            for block in self.blocks:
-                x = block(x, **kwargs)
-        return x
 
     def unpatchify(self, x, grid_sizes):
         r"""

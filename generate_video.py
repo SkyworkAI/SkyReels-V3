@@ -87,6 +87,7 @@ def prepare_and_broadcast_inputs(args, local_rank: int):
 
     return args
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -166,7 +167,7 @@ if __name__ == "__main__":
     logging.info(f"input params: {args}")
 
     args = prepare_and_broadcast_inputs(args, local_rank)
-        
+
     video_out = None
 
     # init pipeline
