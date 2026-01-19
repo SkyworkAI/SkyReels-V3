@@ -128,11 +128,12 @@ torchrun --nproc_per_node=4 generate_video.py --task_type single_shot_extension 
 ##### Shot Switching Video Extension
 - Single-GPU inference
 ```bash
-python3 generate_video.py --task_type shot_switching_extension --input_video https://skyreels-api.oss-cn-hongkong.aliyuncs.com/examples/video_extension/6.mp4 --prompt "Create a top side angle view of the robot playing the guitar" --offload
+python3 generate_video.py --task_type shot_switching_extension --input_video https://skyreels-api.oss-accelerate.aliyuncs.com/examples/video_extension/test.mp4 --prompt "[ZOOM_IN_CUT] The scene cuts from a medium shot of a visually impaired man walking on a path in a park. The shot then cut in to a close-up of the man's face and upper torso. The visually impaired Black man is shown from the chest up, wearing dark sunglasses, a grey turtleneck scarf, and a light olive green jacket. His head is held straight, looking forward towards the camera, continuing his walk. The lighting is natural and bright. The background is a soft blur of green trees and foliage from the park." --offload
 ```
 - Multi-GPU inference using xDiT USP
 ```bash
-torchrun --nproc_per_node=4 generate_video.py --task_type shot_switching_extension --input_video https://skyreels-api.oss-cn-hongkong.aliyuncs.com/examples/video_extension/6.mp4 --prompt "Create a top side angle view of the robot playing the guitar" --offload --use_usp
+torchrun --nproc_per_node=4 generate_video.py --task_type shot_switching_extension --input_video https://skyreels-api.oss-accelerate.aliyuncs.com/examples/video_extension/test.mp4 --prompt "[ZOOM_IN_CUT] The scene cuts from a medium shot of a visually impaired man walking on a path in a park. The shot then cut in to a close-up of the man's face and upper torso. The visually impaired Black man is shown from the chest up, wearing dark sunglasses, a grey turtleneck scarf, and a light olive green jacket. His head is held straight, looking forward towards the camera, continuing his walk. The lighting is natural and bright. The background is a soft blur of green trees and foliage from the park." --offload --use_usp
+
 ```
 > 💡Note: 
 > * The ***task_type*** parameter must be set to "shot_switching_extension".
