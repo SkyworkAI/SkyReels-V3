@@ -12,7 +12,7 @@ from diffusers.configuration_utils import ConfigMixin, register_to_config
 from einops import rearrange, repeat
 from xfuser.core.distributed import get_sp_group
 
-from ..utils.a2v_util import get_attn_map_with_target, normalize_and_scale, rotate_half
+from ..utils.avatar_util import get_attn_map_with_target, normalize_and_scale, rotate_half
 from .attention import attention, flash_attention
 
 __all__ = ["WanModel"]

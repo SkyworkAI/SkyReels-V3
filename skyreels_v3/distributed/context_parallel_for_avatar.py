@@ -13,7 +13,7 @@ from xfuser.core.distributed import (
 from xfuser.core.long_ctx_attention import xFuserLongContextAttention
 
 from ..modules.transformer import sinusoidal_embedding_1d
-from ..utils.a2v_util import get_attn_map_with_target
+from ..utils.avatar_util import get_attn_map_with_target
 
 
 def pad_freqs(original_tensor, target_len):

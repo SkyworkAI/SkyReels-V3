@@ -23,7 +23,7 @@ from ..modules.clip import CLIPModel
 from ..modules.t5 import T5EncoderModel
 from ..modules.transformer_a2v import WanModel
 from ..modules.vae import WanVAE
-from ..utils.a2v_util import (
+from ..utils.avatar_util import (
     ASPECT_RATIO_627,
     ASPECT_RATIO_960,
     match_and_blend_colors,
@@ -84,7 +84,7 @@ def timestep_transform(
     return new_t
 
 
-class Audio2VideoSinglePipeline:
+class TalkingAvatarPipeline:
     @classmethod
     def init_dit_model(
         cls,
@@ -167,7 +167,7 @@ class Audio2VideoSinglePipeline:
         if use_usp:
             from xfuser.core.distributed import get_sequence_parallel_world_size
 
-            from ..distributed.xdit_context_parallel_a2v import (
+            from ..distributed.context_parallel_for_avatar import (
                 usp_attn_forward_multitalk,
                 usp_crossattn_multi_forward_multitalk,
                 usp_dit_forward_multitalk,

@@ -23,12 +23,12 @@ from diffusers.utils import load_image
 from skyreels_v3.configs import WAN_CONFIGS
 from skyreels_v3.modules import download_model
 from skyreels_v3.pipelines import (
-    Audio2VideoSinglePipeline,
     ReferenceToVideoPipeline,
     ShotSwitchingExtensionPipeline,
     SingleShotExtensionPipeline,
+    TalkingAvatarPipeline,
 )
-from skyreels_v3.utils.a2v_preprocess import preprocess_audio
+from skyreels_v3.utils.avatar_preprocess import preprocess_audio
 
 
 def maybe_download(path_or_url: str, save_dir: str) -> str:
@@ -74,7 +74,7 @@ def prepare_and_broadcast_inputs(args, local_rank: int):
         if args.task_type in ["single_shot_extension", "shot_switching_extension"]:
             updates["input_video"] = maybe_download(args.input_video, "input_video")
 
-        if args.task_type == "audio2video_single":
+        if args.task_type == "talking_avatar":
             updates["input_audio"] = maybe_download(args.input_audio, "input_audio")
             updates["input_image"] = maybe_download(args.input_image, "input_image")
 
@@ -118,7 +118,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--task_type",
         type=str,
-        choices=["single_shot_extension", "shot_switching_extension", "reference_to_video", "audio2video_single"],
+        choices=["single_shot_extension", "shot_switching_extension", "reference_to_video", "talking_avatar"],
     )
     parser.add_argument("--model_id", type=str, default="video_extension_model")
     parser.add_argument("--duration", type=int, default=5)
@@ -210,9 +210,9 @@ if __name__ == "__main__":
     elif args.task_type == "reference_to_video":
         pipe = ReferenceToVideoPipeline(model_path=args.model_id, use_usp=args.use_usp, offload=args.offload)
         video_out = pipe.generate_video(args.ref_imgs, args.prompt, args.duration, args.seed)
-    elif args.task_type == "audio2video_single":
+    elif args.task_type == "talking_avatar":
         config = WAN_CONFIGS["multitalk-14B"]
-        pipe = Audio2VideoSinglePipeline(
+        pipe = TalkingAvatarPipeline(
             config=config,
             model_path=args.model_id,
             device_id=local_rank,
@@ -269,7 +269,7 @@ if __name__ == "__main__":
             quality=8,
             output_params=["-loglevel", "error"],
         )
-        if args.task_type == "audio2video_single":
+        if args.task_type == "talking_avatar":
             video_with_audio_path = os.path.join(save_dir, video_out_file.replace(".mp4", "_with_audio.mp4"))
             audio_path = kwargs["input_data"]["video_audio"]
             video_in = os.path.abspath(output_path)
