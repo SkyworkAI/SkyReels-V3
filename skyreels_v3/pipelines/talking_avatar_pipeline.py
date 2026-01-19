@@ -93,9 +93,10 @@ class TalkingAvatarPipeline:
     ) -> Dict[str, WanModel]:
         print(f"load dit model from: {checkpoint_dir}")
         state_dict = {}
-        for file in os.listdir(checkpoint_dir):
-            if file.endswith(".safetensors"):
-                state_dict.update(load_file(os.path.join(checkpoint_dir, file)))
+        with torch.device("cpu"):
+            for file in os.listdir(checkpoint_dir):
+                if file.endswith(".safetensors"):
+                    state_dict.update(load_file(os.path.join(checkpoint_dir, file)))
 
         model = WanModel.from_config(os.path.join(checkpoint_dir, "config.json")).to(torch.bfloat16)
         model.load_state_dict(state_dict, strict=True, assign=True)
