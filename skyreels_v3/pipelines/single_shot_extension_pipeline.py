@@ -45,10 +45,17 @@ class SingleShotExtensionPipeline:
             weight_dtype: Weight data type, defaults to torch.bfloat16
         """
         load_device = "cpu" if offload else device
-        self.transformer = get_transformer(model_path, subfolder="transformer", device=load_device, weight_dtype=weight_dtype)
+        self.transformer = get_transformer(
+            model_path,
+            subfolder="transformer",
+            device=load_device,
+            weight_dtype=weight_dtype,
+        )
         vae_model_path = os.path.join(model_path, "Wan2.1_VAE.pth")
         self.vae = get_vae(vae_model_path, device=device, weight_dtype=torch.float32)
-        self.text_encoder = get_text_encoder(model_path, device=load_device, weight_dtype=weight_dtype)
+        self.text_encoder = get_text_encoder(
+            model_path, device=load_device, weight_dtype=weight_dtype
+        )
         self.video_processor = VideoProcessor(vae_scale_factor=16)
         self.device = device
         self.offload = offload
@@ -60,7 +67,7 @@ class SingleShotExtensionPipeline:
 
             from xfuser.core.distributed import get_sequence_parallel_world_size
 
-            from ..distributed.xdit_context_parallel import (
+            from ..distributed.context_parallel_for_extension import (
                 usp_attn_forward,
                 usp_dit_forward,
             )
@@ -139,9 +146,9 @@ class SingleShotExtensionPipeline:
                 generator=torch.Generator(device=self.device).manual_seed(seed),
                 **kwargs,
             )[0]
-            #if i == 0:
+            # if i == 0:
             #    output_video_frames.append(video_frames)
-            #else:
+            # else:
             output_video_frames.append(video_frames[num_condition_frames:])
             prefix_video = torch.tensor(video_frames[-num_condition_frames:]).unsqueeze(
                 0
@@ -193,7 +200,9 @@ class SingleShotExtensionPipeline:
             if self.do_classifier_free_guidance
             else None
         )
-        logging.info(f"guidance_scale: {guidance_scale}, do_classifier_free_guidance: {self.do_classifier_free_guidance}")
+        logging.info(
+            f"guidance_scale: {guidance_scale}, do_classifier_free_guidance: {self.do_classifier_free_guidance}"
+        )
         if self.offload:
             self.text_encoder.to("cpu")
             gc.collect()
@@ -213,7 +222,7 @@ class SingleShotExtensionPipeline:
 
         if self.offload:
             self.transformer.to(self.device)
-        
+
         logging.info(f"start transformer forward, latents: {latents[0].shape}")
 
         with torch.cuda.amp.autocast(dtype=self.transformer.dtype), torch.no_grad():
@@ -259,7 +268,9 @@ class SingleShotExtensionPipeline:
                     generator=generator,
                 )[0]
                 latents = [temp_x0.squeeze(0)]
-            logging.info(f"finish transformer forward, latents: {latents[0].shape}, {latents[0].device}")
+            logging.info(
+                f"finish transformer forward, latents: {latents[0].shape}, {latents[0].device}"
+            )
             if self.offload:
                 self.transformer.cpu()
                 torch.cuda.empty_cache()

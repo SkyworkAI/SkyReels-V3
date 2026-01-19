@@ -12,18 +12,19 @@ logging.basicConfig(
     force=True,
     handlers=[logging.StreamHandler()],  # 显式指定输出到终端
 )
-
 import subprocess
 
 import imageio
 import torch
 import torch.distributed as dist
 import wget
+from diffusers.utils import load_image
 
 from skyreels_v3.configs import WAN_CONFIGS
 from skyreels_v3.modules import download_model
 from skyreels_v3.pipelines import (
     Audio2VideoSinglePipeline,
+    ReferenceToVideoPipeline,
     ShotSwitchingExtensionPipeline,
     SingleShotExtensionPipeline,
 )
@@ -63,7 +64,12 @@ def prepare_and_broadcast_inputs(args, local_rank: int):
 
     obj_list = [None]
     if is_rank0:
-        updates = {"input_video": args.input_video, "input_audio": args.input_audio, "input_image": args.input_image}
+        updates = {
+            "input_video": args.input_video,
+            "input_audio": args.input_audio,
+            "input_image": args.input_image,
+            "ref_imgs": args.ref_imgs,
+        }
 
         if args.task_type in ["single_shot_extension", "shot_switching_extension"]:
             updates["input_video"] = maybe_download(args.input_video, "input_video")
@@ -71,6 +77,14 @@ def prepare_and_broadcast_inputs(args, local_rank: int):
         if args.task_type == "audio2video_single":
             updates["input_audio"] = maybe_download(args.input_audio, "input_audio")
             updates["input_image"] = maybe_download(args.input_image, "input_image")
+
+        if args.task_type == "reference_to_video":
+            # Normalize to list[str] and resolve URLs to local paths on rank0.
+            ref_imgs = args.ref_imgs
+            if isinstance(ref_imgs, str):
+                ref_imgs = [p.strip() for p in ref_imgs.split(",") if p.strip()]
+            assert isinstance(ref_imgs, list) and len(ref_imgs) > 0, "ref_imgs must be a list of images"
+            updates["ref_imgs"] = [maybe_download(p, "ref_imgs") for p in ref_imgs]
 
         obj_list[0] = updates
         print("prepare input data done")
@@ -84,6 +98,17 @@ def prepare_and_broadcast_inputs(args, local_rank: int):
         args.input_video = updates.get("input_video", args.input_video)
         args.input_audio = updates.get("input_audio", args.input_audio)
         args.input_image = updates.get("input_image", args.input_image)
+        args.ref_imgs = updates.get("ref_imgs", args.ref_imgs)
+
+    # For reference_to_video, load images on every rank after we agree on local paths.
+    if args.task_type == "reference_to_video":
+        ref_imgs = args.ref_imgs
+        if isinstance(ref_imgs, str):
+            ref_imgs = [p.strip() for p in ref_imgs.split(",") if p.strip()]
+        if isinstance(ref_imgs, list) and (len(ref_imgs) == 0 or isinstance(ref_imgs[0], str)):
+            ref_imgs = [load_image(p) for p in ref_imgs]
+        args.ref_imgs = ref_imgs
+        assert isinstance(args.ref_imgs, list) and len(args.ref_imgs) > 0, "ref_imgs must be a list of images"
 
     return args
 
@@ -93,10 +118,15 @@ if __name__ == "__main__":
     parser.add_argument(
         "--task_type",
         type=str,
-        choices=["single_shot_extension", "shot_switching_extension", "audio2video_single"],
+        choices=["single_shot_extension", "shot_switching_extension", "reference_to_video", "audio2video_single"],
     )
     parser.add_argument("--model_id", type=str, default="video_extension_model")
     parser.add_argument("--duration", type=int, default=5)
+    parser.add_argument(
+        "--ref_imgs",
+        type=str,
+        default="https://skyreels-api.oss-accelerate.aliyuncs.com/examples/subject_reference/0_0.png",
+    )
     parser.add_argument(
         "--prompt",
         type=str,
@@ -177,6 +207,9 @@ if __name__ == "__main__":
     elif args.task_type == "shot_switching_extension":
         pipe = ShotSwitchingExtensionPipeline(model_path=args.model_id, use_usp=args.use_usp, offload=args.offload)
         video_out = pipe.extend_video(args.input_video, args.prompt, args.duration, args.seed)
+    elif args.task_type == "reference_to_video":
+        pipe = ReferenceToVideoPipeline(model_path=args.model_id, use_usp=args.use_usp, offload=args.offload)
+        video_out = pipe.generate_video(args.ref_imgs, args.prompt, args.duration, args.seed)
     elif args.task_type == "audio2video_single":
         config = WAN_CONFIGS["multitalk-14B"]
         pipe = Audio2VideoSinglePipeline(

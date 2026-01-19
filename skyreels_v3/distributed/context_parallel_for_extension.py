@@ -1,8 +1,10 @@
 import torch
 import torch.amp as amp
-from xfuser.core.distributed import get_sequence_parallel_rank
-from xfuser.core.distributed import get_sequence_parallel_world_size
-from xfuser.core.distributed import get_sp_group
+from xfuser.core.distributed import (
+    get_sequence_parallel_rank,
+    get_sequence_parallel_world_size,
+    get_sp_group,
+)
 from xfuser.core.long_ctx_attention import xFuserLongContextAttention
 from yunchang.kernels import AttnType
 
@@ -13,7 +15,9 @@ def pad_freqs(original_tensor, target_len):
     """Pad frequency tensor to target length for sequence parallel."""
     seq_len, s1, s2 = original_tensor.shape
     pad_size = target_len - seq_len
-    padding_tensor = torch.ones(pad_size, s1, s2, dtype=original_tensor.dtype, device=original_tensor.device)
+    padding_tensor = torch.ones(
+        pad_size, s1, s2, dtype=original_tensor.dtype, device=original_tensor.device
+    )
     padded_tensor = torch.cat([original_tensor, padding_tensor], dim=0)
     return padded_tensor
 
@@ -57,20 +61,30 @@ def rope_apply(
         num_frame = f - sum(num_frame_list)
 
         latent_seq_len = num_frame * h * w
-        freqs_i = torch.cat([
-            freqs[0][:num_frame].view(num_frame, 1, 1, -1).expand(num_frame, h, w, -1),
-            freqs[1][:h].view(1, h, 1, -1).expand(num_frame, h, w, -1),
-            freqs[2][:w].view(1, 1, w, -1).expand(num_frame, h, w, -1)
-        ], dim=-1).reshape(latent_seq_len, 1, -1)
+        freqs_i = torch.cat(
+            [
+                freqs[0][:num_frame]
+                .view(num_frame, 1, 1, -1)
+                .expand(num_frame, h, w, -1),
+                freqs[1][:h].view(1, h, 1, -1).expand(num_frame, h, w, -1),
+                freqs[2][:w].view(1, 1, w, -1).expand(num_frame, h, w, -1),
+            ],
+            dim=-1,
+        ).reshape(latent_seq_len, 1, -1)
 
         freqs_context_list = []
         for ii, nf in enumerate(num_frame_list):
             start = 1024 if ii == 0 else 1024 + sum(num_frame_list[:ii])
-            freqs_temp = torch.cat([
-                freqs[0][start:start + nf].view(nf, 1, 1, -1).expand(nf, h, w, -1),
-                freqs[1][:h].view(1, h, 1, -1).expand(nf, h, w, -1),
-                freqs[2][:w].view(1, 1, w, -1).expand(nf, h, w, -1)
-            ], dim=-1).reshape(num_token_list[ii], 1, -1)
+            freqs_temp = torch.cat(
+                [
+                    freqs[0][start : start + nf]
+                    .view(nf, 1, 1, -1)
+                    .expand(nf, h, w, -1),
+                    freqs[1][:h].view(1, h, 1, -1).expand(nf, h, w, -1),
+                    freqs[2][:w].view(1, 1, w, -1).expand(nf, h, w, -1),
+                ],
+                dim=-1,
+            ).reshape(num_token_list[ii], 1, -1)
             freqs_context_list.append(freqs_temp)
 
         freqs_context = torch.cat(freqs_context_list, dim=0)
@@ -86,33 +100,44 @@ def rope_apply(
             start = 0 if i == 0 else sum(num_frame_list[:i])
             _, c_h, c_w = grid_size_list[i]
             end = start + nf
-            freqs_tmp = torch.cat([
-                freqs[0][start:end].view(nf, 1, 1, -1).expand(nf, c_h, c_w, -1),
-                freqs[1][:c_h].view(1, c_h, 1, -1).expand(nf, c_h, c_w, -1),
-                freqs[2][:c_w].view(1, 1, c_w, -1).expand(nf, c_h, c_w, -1)
-            ], dim=-1).reshape(nf * c_h * c_w, 1, -1)
+            freqs_tmp = torch.cat(
+                [
+                    freqs[0][start:end].view(nf, 1, 1, -1).expand(nf, c_h, c_w, -1),
+                    freqs[1][:c_h].view(1, c_h, 1, -1).expand(nf, c_h, c_w, -1),
+                    freqs[2][:c_w].view(1, 1, c_w, -1).expand(nf, c_h, c_w, -1),
+                ],
+                dim=-1,
+            ).reshape(nf * c_h * c_w, 1, -1)
             freqs_list.append(freqs_tmp)
 
-        freqs_i = torch.cat([
-            freqs[0][sum(num_frame_list):f].view(num_latent_frame, 1, 1, -1).expand(num_latent_frame, h, w, -1),
-            freqs[1][:h].view(1, h, 1, -1).expand(num_latent_frame, h, w, -1),
-            freqs[2][:w].view(1, 1, w, -1).expand(num_latent_frame, h, w, -1)
-        ], dim=-1).reshape(latent_seq_len, 1, -1)
+        freqs_i = torch.cat(
+            [
+                freqs[0][sum(num_frame_list) : f]
+                .view(num_latent_frame, 1, 1, -1)
+                .expand(num_latent_frame, h, w, -1),
+                freqs[1][:h].view(1, h, 1, -1).expand(num_latent_frame, h, w, -1),
+                freqs[2][:w].view(1, 1, w, -1).expand(num_latent_frame, h, w, -1),
+            ],
+            dim=-1,
+        ).reshape(latent_seq_len, 1, -1)
         freqs_list.append(freqs_i)
         freqs_i = torch.cat(freqs_list, dim=0)
 
     else:
         # Standard rope apply
         seq_len = f * h * w
-        freqs_i = torch.cat([
-            freqs[0][:f].view(f, 1, 1, -1).expand(f, h, w, -1),
-            freqs[1][:h].view(1, h, 1, -1).expand(f, h, w, -1),
-            freqs[2][:w].view(1, 1, w, -1).expand(f, h, w, -1),
-        ], dim=-1).reshape(seq_len, 1, -1)
+        freqs_i = torch.cat(
+            [
+                freqs[0][:f].view(f, 1, 1, -1).expand(f, h, w, -1),
+                freqs[1][:h].view(1, h, 1, -1).expand(f, h, w, -1),
+                freqs[2][:w].view(1, 1, w, -1).expand(f, h, w, -1),
+            ],
+            dim=-1,
+        ).reshape(seq_len, 1, -1)
 
     # Apply sequence parallel slicing to freqs
     freqs_i = pad_freqs(freqs_i, s * sp_size)
-    freqs_i_rank = freqs_i[(sp_rank * s):((sp_rank + 1) * s), :, :]
+    freqs_i_rank = freqs_i[(sp_rank * s) : ((sp_rank + 1) * s), :, :]
 
     # Apply rotary embedding (matching single-card logic)
     x = torch.view_as_complex(x.to(torch.float32).reshape(bs, s, n, -1, 2))
@@ -159,11 +184,27 @@ def usp_attn_forward(
     v = self.v(x).view(b, s, n, d)
 
     # apply rope
-    q = rope_apply(q, grid_sizes, freqs, context_window_size, num_token_list, num_frame_list, grid_size_list)
-    k = rope_apply(k, grid_sizes, freqs, context_window_size, num_token_list, num_frame_list, grid_size_list)
+    q = rope_apply(
+        q,
+        grid_sizes,
+        freqs,
+        context_window_size,
+        num_token_list,
+        num_frame_list,
+        grid_size_list,
+    )
+    k = rope_apply(
+        k,
+        grid_sizes,
+        freqs,
+        context_window_size,
+        num_token_list,
+        num_frame_list,
+        grid_size_list,
+    )
 
     # attention with xFuser
-    #attn_type = AttnType.SAGE_AUTO
+    # attn_type = AttnType.SAGE_AUTO
     attn_type = AttnType.FA
     x = xFuserLongContextAttention(attn_type=attn_type)(
         None, query=half(q), key=half(k), value=half(v), window_size=self.window_size
@@ -220,7 +261,9 @@ def usp_dit_forward(
     else:
         # list of tensors path
         x = [self.patch_embedding(item) for item in x]
-        grid_size_list = [torch.tensor(item.shape[2:], dtype=torch.long) for item in x[1:]]
+        grid_size_list = [
+            torch.tensor(item.shape[2:], dtype=torch.long) for item in x[1:]
+        ]
         num_frame_list = [item.shape[2] for item in x[1:]]
 
         grid_sizes = torch.tensor(x[0].shape[2:], dtype=torch.long)
