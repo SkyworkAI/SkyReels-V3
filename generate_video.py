@@ -113,14 +113,26 @@ def prepare_and_broadcast_inputs(args, local_rank: int):
     return args
 
 
+MODEL_ID_CONFIG = {
+    "single_shot_extension": "Skywork/SkyReels-V3-Video-Extension",
+    "shot_switching_extension": "Skywork/SkyReels-V3-Video-Extension",
+    "reference_to_video": "Skywork/SkyReels-V3-Reference2Video",
+    "talking_avatar": "Skywork/SkyReels-V3-TalkingAvatar",
+}
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--task_type",
         type=str,
-        choices=["single_shot_extension", "shot_switching_extension", "reference_to_video", "talking_avatar"],
+        choices=[
+            "single_shot_extension",
+            "shot_switching_extension",
+            "reference_to_video",
+            "talking_avatar",
+        ],
     )
-    parser.add_argument("--model_id", type=str, default="video_extension_model")
+    parser.add_argument("--model_id", type=str, default=None)
     parser.add_argument("--duration", type=int, default=5)
     parser.add_argument(
         "--ref_imgs",
@@ -155,6 +167,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    if args.model_id is None:
+        args.model_id = MODEL_ID_CONFIG[args.task_type]
     # init multi gpu environment
     local_rank = 0
     if args.use_usp:
