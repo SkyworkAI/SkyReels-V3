@@ -27,9 +27,10 @@ from skyreels_v3.pipelines import (
 
 
 MODEL_ID_CONFIG = {
-    "single_shot_extension": "",
-    "shot_switching_extension": "",
-    "reference_to_video": "",
+    "single_shot_extension": "Skywork/SkyReels-V3-Video-Extension",
+    "shot_switching_extension": "Skywork/SkyReels-V3-Video-Extension",
+    "reference_to_video": "Skywork/SkyReels-V3-Reference2Video",
+    "talking_avatar": "Skywork/SkyReels-V3-TalkingAvatar",
 }
 
 if __name__ == "__main__":
@@ -41,9 +42,10 @@ if __name__ == "__main__":
             "single_shot_extension",
             "shot_switching_extension",
             "reference_to_video",
+            "talking_avatar",
         ],
     )
-    # parser.add_argument("--model_id", type=str, default="video_extension_model")
+    parser.add_argument("--model_id", type=str, default=None)
     parser.add_argument("--duration", type=int, default=5)
     parser.add_argument(
         "--ref_imgs",
@@ -66,7 +68,10 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    args.model_id = download_model(args.model_id)
+    if args.model_id is None:
+        args.model_id = download_model(MODEL_ID_CONFIG[args.task_type])
+    else:
+        args.model_id = download_model(args.model_id)
     assert (args.use_usp and args.seed is not None) or (
         not args.use_usp
     ), "usp mode need seed"

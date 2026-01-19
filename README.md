@@ -5,7 +5,7 @@
 <h1 align="center">SkyReels V3: Multimodal Video Generation Model</h1> 
 
 <p align="center">
-👋 <a href="https://www.skyreels.ai/" target="_blank">Playground</a> · 🤗 <a href="https://huggingface.co/collections/Skywork/skyreels-v2-6801b1b93df627d441d0d0d9" target="_blank">Hugging Face</a> · 🤖 <a href="https://www.modelscope.cn/collections/SkyReels-V2-f665650130b144" target="_blank">ModelScope</a>
+👋 <a href="https://www.skyreels.ai/" target="_blank">Playground</a> · 🤗 <a href="https://huggingface.co/collections/Skywork/skyreels-v3" target="_blank">Hugging Face</a> · 🤖 <a href="https://www.modelscope.cn/collections/SkyReels-V2-f665650130b144" target="_blank">ModelScope</a>
 </p>
 
 ---
@@ -74,17 +74,17 @@ You can download our models from Hugging Face:
     <tr>
       <td>Reference to Video</td>
       <td>14B-720P</td>
-      <td>🤗 <a href="#">Huggingface</a> 🤖 <a href="#">ModelScope</a></td>
+      <td>🤗 <a href="https://huggingface.co/Skywork/SkyReels-V3-Reference2Video">Huggingface</a> 🤖 <a href="#">ModelScope</a></td>
     </tr>
     <tr>
       <td>Video Extension</td>
       <td>14B-720P</td>
-      <td>🤗 <a href="#">Huggingface</a> 🤖 <a href="#">ModelScope</a></td>
+      <td>🤗 <a href="https://huggingface.co/Skywork/SkyReels-V3-Video-Extension">Huggingface</a> 🤖 <a href="#">ModelScope</a></td>
     </tr>
     <tr>
       <td>Talking Avatar</td>
       <td>14B-720P</td>
-      <td>🤗 <a href="#">Huggingface</a> 🤖 <a href="#">ModelScope</a></td>
+      <td>🤗 <a href="https://huggingface.co/Skywork/SkyReels-V3-Talking-Avatar">Huggingface</a> 🤖 <a href="#">ModelScope</a></td>
     </tr>
   </tbody>
 </table>
@@ -148,3 +148,16 @@ The Talking Avatar model generates vibrant, lifelike talking avatars from a sing
 - Multi-GPU inference using xDiT USP
 ```bash
 ```
+
+## Acknowledgements
+We would like to thank the contributors of <a href="https://github.com/Wan-Video/Wan2.1">Wan 2.1</a>, <a href="https://github.com/xdit-project/xDiT">XDit</a> and <a href="https://github.com/huggingface/diffusers">diffusers</a> repositories, for their open research and contributions.
+
+## Github Star History
+
+<a href="https://star-history.com/#SkyworkAI/SkyReels-V3&Date">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=SkyworkAI/SkyReels-V3&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=SkyworkAI/SkyReels-V3&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=SkyworkAI/SkyReels-V3&type=Date" />
+ </picture>
+</a>
