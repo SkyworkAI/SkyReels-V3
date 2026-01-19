@@ -729,11 +729,11 @@ class ReferenceToVideoPipeline:
         self.offload = offload
         self.device = device
 
-        # hardcode
-        from torchao.quantization import float8_weight_only, quantize_
+        # hardcode for testing
+        # from torchao.quantization import float8_weight_only, quantize_
 
-        quantize_(self.pipeline.transformer, float8_weight_only(), device=device)
-        self.pipeline.transformer.to(load_device)
+        # quantize_(self.pipeline.transformer, float8_weight_only(), device=device)
+        # self.pipeline.transformer.to(load_device)
 
         if self.use_usp:
             from ..distributed.context_parallel_for_reference import (
@@ -755,7 +755,6 @@ class ReferenceToVideoPipeline:
         from ..utils.util import get_height_width_from_image
 
         height, width = get_height_width_from_image(ref_imgs[0], resolution)
-        height, width = 720, 1280
         ref_imgs = resize_ref_images(ref_imgs, (width, height))
         num_frames = duration * 24 + 1
         logging.info(f"height: {height}, width: {width}, num_frames: {num_frames}")

@@ -95,11 +95,11 @@ After downloading, set the model path in your generation commands:
 Reference-to-Video is a model that synthesizes coherent video sequences from 1 to 4 reference images and a text prompt. It excels at maintaining strong identity fidelity and narrative consistency for characters, objects, and backgrounds.
 - Single-GPU inference
 ```bash
-python3 generate_video.py --task_type reference_to_video --ref_imgs "https://skyreels-api.oss-accelerate.aliyuncs.com/examples/subject_reference/0_1.png,https://skyreels-api.oss-accelerate.aliyuncs.com/examples/subject_reference/0_2.png" --prompt "two girls talking in a club" --duration 5 --offload
+python3 generate_video.py --task_type reference_to_video --ref_imgs "https://skyreels-api.oss-accelerate.aliyuncs.com/examples/subject_reference/0_1.png,https://skyreels-api.oss-accelerate.aliyuncs.com/examples/subject_reference/0_2.png" --prompt "In a dimly lit, cluttered occult club room adorned with shelves full of books, skulls, and mysterious dolls, two young Asian girls are talking. One girl has vibrant teal pigtails with bangs, wearing a white collared polo shirt, while the other has a sleek black bob with bangs, also in a white polo shirt, conversing under the hum of fluorescent lights, a high-quality and detailed cinematic shot." --duration 5 --offload
 ```
 - Multi-GPU inference using xDiT USP
 ```bash
-torchrun --nproc_per_node=4 generate_video.py --task_type reference_to_video --ref_imgs "https://skyreels-api.oss-accelerate.aliyuncs.com/examples/subject_reference/0_1.png,https://skyreels-api.oss-accelerate.aliyuncs.com/examples/subject_reference/0_2.png" --prompt "two girls talking in a club" --duration 5 --use_usp
+torchrun --nproc_per_node=4 generate_video.py --task_type reference_to_video --ref_imgs "https://skyreels-api.oss-accelerate.aliyuncs.com/examples/subject_reference/0_1.png,https://skyreels-api.oss-accelerate.aliyuncs.com/examples/subject_reference/0_2.png" --prompt "In a dimly lit, cluttered occult club room adorned with shelves full of books, skulls, and mysterious dolls, two young Asian girls are talking. One girl has vibrant teal pigtails with bangs, wearing a white collared polo shirt, while the other has a sleek black bob with bangs, also in a white polo shirt, conversing under the hum of fluorescent lights, a high-quality and detailed cinematic shot." --duration 5 --offload --use_usp
 ```
 > 💡Note: 
 > * The ***task_type*** parameter must be set to "reference_to_video".

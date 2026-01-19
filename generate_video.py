@@ -25,6 +25,13 @@ from skyreels_v3.pipelines import (
     SingleShotExtensionPipeline,
 )
 
+
+MODEL_ID_CONFIG = {
+    "single_shot_extension": "",
+    "shot_switching_extension": "",
+    "reference_to_video": "",
+}
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -36,7 +43,7 @@ if __name__ == "__main__":
             "reference_to_video",
         ],
     )
-    parser.add_argument("--model_id", type=str, default="video_extension_model")
+    # parser.add_argument("--model_id", type=str, default="video_extension_model")
     parser.add_argument("--duration", type=int, default=5)
     parser.add_argument(
         "--ref_imgs",
@@ -90,6 +97,8 @@ if __name__ == "__main__":
         assert len(args.ref_imgs) > 0, "ref_imgs must be a list of images"
     else:
         raise ValueError(f"Invalid task type: {args.task_type}")
+    
+    args.model_id = MODEL_ID_CONFIG[args.task_type]
 
     logging.info(f"input params: {args}")
 
