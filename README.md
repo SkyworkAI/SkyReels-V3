@@ -74,17 +74,17 @@ You can download our models from Hugging Face:
     <tr>
       <td>Reference to Video</td>
       <td>14B-720P</td>
-      <td>🤗 <a href="https://huggingface.co/Skywork/SkyReels-V3-Reference2Video">Huggingface</a> 🤖 <a href="#">ModelScope</a></td>
+      <td>🤗 <a href="https://huggingface.co/Skywork/SkyReels-V3-R2V-14B">Huggingface</a> 🤖 <a href="#">ModelScope</a></td>
     </tr>
     <tr>
       <td>Video Extension</td>
       <td>14B-720P</td>
-      <td>🤗 <a href="https://huggingface.co/Skywork/SkyReels-V3-Video-Extension">Huggingface</a> 🤖 <a href="#">ModelScope</a></td>
+      <td>🤗 <a href="https://huggingface.co/Skywork/SkyReels-V3-V2V-14B">Huggingface</a> 🤖 <a href="#">ModelScope</a></td>
     </tr>
     <tr>
       <td>Talking Avatar</td>
-      <td>14B-720P</td>
-      <td>🤗 <a href="https://huggingface.co/Skywork/SkyReels-V3-Talking-Avatar">Huggingface</a> 🤖 <a href="#">ModelScope</a></td>
+      <td>19B-720P</td>
+      <td>🤗 <a href="https://huggingface.co/Skywork/SkyReels-V3-A2V-19B">Huggingface</a> 🤖 <a href="#">ModelScope</a></td>
     </tr>
   </tbody>
 </table>
