@@ -92,7 +92,58 @@ You can download our models from Hugging Face:
 After downloading, set the model path in your generation commands:
 
 #### Reference to Video
+Reference-to-Video is a model that synthesizes coherent video sequences from 1 to 4 reference images and a text prompt. It excels at maintaining strong identity fidelity and narrative consistency for characters, objects, and backgrounds.
+- Single-GPU inference
+```bash
+python3 generate_video.py --task_type reference_to_video --ref_imgs "https://skyreels-api.oss-accelerate.aliyuncs.com/examples/subject_reference/0_1.png,https://skyreels-api.oss-accelerate.aliyuncs.com/examples/subject_reference/0_2.png" --prompt "two girls talking in a club" --duration 5 --offload
+```
+- Multi-GPU inference using xDiT USP
+```bash
+torchrun --nproc_per_node=4 generate_video.py --task_type reference_to_video --ref_imgs "https://skyreels-api.oss-accelerate.aliyuncs.com/examples/subject_reference/0_1.png,https://skyreels-api.oss-accelerate.aliyuncs.com/examples/subject_reference/0_2.png" --prompt "two girls talking in a club" --duration 5 --use_usp
+```
+> 💡Note: 
+> * The ***task_type*** parameter must be set to "reference_to_video".
+> * The ***ref_imgs*** parameter accepts 1 to 4 reference images. When providing multiple images, please separate their paths or URLs with commas.
+> * The recommended output specification for this model is a 5-second video at 720p and 24 fps.
 
 #### Video Extension
+Video Extension is a suite of models designed to extend existing videos while preserving motion continuity, scene coherence, and the visual identity of subjects. It includes two main models: Single-shot Video Extension and Shot Switching Video Extension.
+
+- **Single-shot Video Extension** supports video extension from 5 seconds to 30 seconds.
+
+- **Shot Switching Video Extension** is designed for video extension with specified shot transitions, supporting cinematography types such as "Cut-In", "Cut-Out", "Shot/Reverse Shot", "Multi-Angle", and "Cut Away", but is currently limited to 5-second extensions.
+
+##### Single-shot Video Extension
+- Single-GPU inference
+```bash
+python3 generate_video.py --task_type single_shot_extension --input_video https://skyreels-api.oss-accelerate.aliyuncs.com/examples/video_extension/test.mp4 --prompt "A man is making his way forward slowly, leaning on a white cane to prop himself up." --duration 5 --offload
+```
+- Multi-GPU inference using xDiT USP
+```bash
+torchrun --nproc_per_node=4 generate_video.py --task_type single_shot_extension --input_video https://skyreels-api.oss-accelerate.aliyuncs.com/examples/video_extension/test.mp4 --prompt "A man is making his way forward slowly, leaning on a white cane to prop himself up." --duration 5 --offload --use_usp
+```
+> 💡Note: 
+> * The ***task_type*** parameter must be set to "single_shot_extension".
+> * The **input_video** parameter specifies the source video to be extended. Since the **single_shot_extension** model supports extensions of 5 to 30 seconds, the **duration** parameter accepts an integer value within this range.
+##### Shot Switching Video Extension
+- Single-GPU inference
+```bash
+python3 generate_video.py --task_type shot_switching_extension --input_video https://skyreels-api.oss-cn-hongkong.aliyuncs.com/examples/video_extension/6.mp4 --prompt "Create a top side angle view of the robot playing the guitar" --offload
+```
+- Multi-GPU inference using xDiT USP
+```bash
+torchrun --nproc_per_node=4 generate_video.py --task_type shot_switching_extension --input_video https://skyreels-api.oss-cn-hongkong.aliyuncs.com/examples/video_extension/6.mp4 --prompt "Create a top side angle view of the robot playing the guitar" --offload --use_usp
+```
+> 💡Note: 
+> * The ***task_type*** parameter must be set to "shot_switching_extension".
+> * The **input_video** parameter specifies the source video to be extended, and the **duration** parameter is therefore limited to a maximum of 5 seconds.
+> * The model supports various cinematography transitions such as "Cut-In" and "Cut-Away". For optimal output, consider using an LLM to integrate these techniques into well-structured generation prompts.
 
 #### Talking Avatar
+The Talking Avatar model generates vibrant, lifelike talking avatars from a single portrait image and an audio clip, supporting videos of up to 200 seconds in length. It is capable of producing multi-avatar scenes, adapting to diverse artistic styles, and delivering performances with rich expressiveness and precise synchronization.
+- Single-GPU inference
+```bash
+```
+- Multi-GPU inference using xDiT USP
+```bash
+```
