@@ -17,6 +17,7 @@ import subprocess
 
 import imageio
 import torch
+import torch.distributed as dist
 import wget
 
 from skyreels_v3.configs import WAN_CONFIGS
@@ -27,6 +28,64 @@ from skyreels_v3.pipelines import (
     SingleShotExtensionPipeline,
 )
 from skyreels_v3.utils.a2v_preprocess import preprocess_audio
+
+
+def maybe_download(path_or_url: str, save_dir: str) -> str:
+    """
+    If `path_or_url` is already a local path, return it.
+    Otherwise, download it into `save_dir` and return the downloaded local path.
+    """
+    if os.path.exists(path_or_url):
+        return path_or_url
+
+    url = path_or_url
+    filename = url.split("/")[-1]
+    local_path = os.path.join(save_dir, filename)
+    logging.info(f"downloading input: {local_path}")
+    os.makedirs(os.path.dirname(local_path), exist_ok=True)
+    if os.path.exists(local_path):
+        logging.info(f"input already exists: {local_path}")
+        return local_path
+
+    wget.download(url, local_path)
+    assert os.path.exists(local_path), f"Failed to download input: {url}"
+    logging.info(f"finished downloading input: {local_path}")
+    return local_path
+
+
+def prepare_and_broadcast_inputs(args, local_rank: int):
+    """
+    Prepare (download) inputs on rank0, and broadcast resolved local paths to all ranks.
+    This keeps multi-process inference consistent (every process sees the same args.input_*).
+    """
+    is_dist = dist.is_available() and dist.is_initialized() and dist.get_world_size() > 1
+    is_rank0 = (dist.get_rank() == 0) if is_dist else (local_rank == 0)
+
+    obj_list = [None]
+    if is_rank0:
+        updates = {"input_video": args.input_video, "input_audio": args.input_audio, "input_image": args.input_image}
+
+        if args.task_type in ["single_shot_extension", "shot_switching_extension"]:
+            updates["input_video"] = maybe_download(args.input_video, "input_video")
+
+        if args.task_type == "audio2video_single":
+            updates["input_audio"] = maybe_download(args.input_audio, "input_audio")
+            updates["input_image"] = maybe_download(args.input_image, "input_image")
+
+        obj_list[0] = updates
+        print("prepare input data done")
+
+    if is_dist:
+        dist.broadcast_object_list(obj_list, src=0)
+        dist.barrier()
+
+    updates = obj_list[0]
+    if updates:
+        args.input_video = updates.get("input_video", args.input_video)
+        args.input_audio = updates.get("input_audio", args.input_audio)
+        args.input_image = updates.get("input_image", args.input_image)
+
+    return args
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -65,62 +124,9 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    args.model_id = download_model(args.model_id)
-    assert (args.use_usp and args.seed is not None) or (not args.use_usp), "usp mode need seed"
-    if args.seed is None:
-        random.seed(time.time())
-        args.seed = int(random.randrange(4294967294))
-
-    if args.task_type in ["single_shot_extension", "shot_switching_extension"]:
-        # check if args.input_video is a local video file, otherwise download it
-        if not os.path.exists(args.input_video):
-            video_url = args.input_video
-            video_name = video_url.split("/")[-1]
-            video_path = os.path.join("input_video", video_name)
-            logging.info(f"downloading input video: {video_path}")
-            os.makedirs(os.path.dirname(video_path), exist_ok=True)
-            if os.path.exists(video_path):
-                logging.info(f"input video already exists: {video_path}")
-                args.input_video = video_path
-            else:
-                wget.download(video_url, video_path)
-                assert os.path.exists(args.input_video), f"Failed to download input video: {args.input_video}"
-                logging.info(f"finished downloading input video: {args.input_video}")
-
-    if args.task_type == "audio2video_single":
-        if not os.path.exists(args.input_audio):
-            audio_url = args.input_audio
-            audio_name = audio_url.split("/")[-1]
-            audio_path = os.path.join("input_audio", audio_name)
-            logging.info(f"downloading input audio: {audio_path}")
-            os.makedirs(os.path.dirname(audio_path), exist_ok=True)
-            if os.path.exists(audio_path):
-                logging.info(f"input audio already exists: {audio_path}")
-                args.input_audio = audio_path
-            else:
-                wget.download(audio_url, audio_path)
-                assert os.path.exists(args.input_audio), f"Failed to download input audio: {args.input_audio}"
-                logging.info(f"finished downloading input audio: {args.input_audio}")
-        if not os.path.exists(args.input_image):
-            image_url = args.input_image
-            image_name = image_url.split("/")[-1]
-            image_path = os.path.join("input_image", image_name)
-            logging.info(f"downloading input image: {image_path}")
-            os.makedirs(os.path.dirname(image_path), exist_ok=True)
-            if os.path.exists(image_path):
-                logging.info(f"input image already exists: {image_path}")
-                args.input_image = image_path
-            else:
-                wget.download(image_url, image_path)
-                assert os.path.exists(args.input_image), f"Failed to download input image: {args.input_image}"
-                logging.info(f"finished downloading input image: {args.input_image}")
-
-    logging.info(f"input params: {args}")
-
     # init multi gpu environment
     local_rank = 0
     if args.use_usp:
-        import torch.distributed as dist
         from xfuser.core.distributed import (
             init_distributed_environment,
             initialize_model_parallel,
@@ -138,6 +144,29 @@ if __name__ == "__main__":
             ulysses_degree=dist.get_world_size(),
         )
     device = f"cuda:{local_rank}"
+
+    # In multi-process inference, only rank0 downloads the model; other ranks receive the resolved path via broadcast.
+    if dist.is_available() and dist.is_initialized() and dist.get_world_size() > 1:
+        obj_list = [None]
+        if dist.get_rank() == 0:
+            obj_list[0] = download_model(args.model_id)
+        dist.broadcast_object_list(obj_list, src=0)
+        args.model_id = obj_list[0]
+        dist.barrier()
+    else:
+        args.model_id = download_model(args.model_id)
+
+    print(f"args.model_id: {args.model_id}")
+
+    assert (args.use_usp and args.seed is not None) or (not args.use_usp), "usp mode need seed"
+    if args.seed is None:
+        random.seed(time.time())
+        args.seed = int(random.randrange(4294967294))
+
+    logging.info(f"input params: {args}")
+
+    args = prepare_and_broadcast_inputs(args, local_rank)
+        
     video_out = None
 
     # init pipeline
@@ -163,7 +192,17 @@ if __name__ == "__main__":
             "cond_image": args.input_image,
             "cond_audio": {"person1": args.input_audio},
         }
-        input_data, _ = preprocess_audio(args.model_id, input_data, "processed_audio")
+        if dist.is_available() and dist.is_initialized() and dist.get_world_size() > 1:
+            # Only rank0 does the heavy audio preprocess + file writes, then broadcasts the result.
+            obj_list = [None]
+            if dist.get_rank() == 0:
+                input_data, _ = preprocess_audio(args.model_id, input_data, "processed_audio")
+                obj_list[0] = input_data
+            dist.broadcast_object_list(obj_list, src=0)
+            input_data = obj_list[0]
+            dist.barrier()
+        else:
+            input_data, _ = preprocess_audio(args.model_id, input_data, "processed_audio")
         kwargs = {
             "input_data": input_data,
             "size_buckget": "multitalk-720",
@@ -177,6 +216,7 @@ if __name__ == "__main__":
             "sampling_steps": 4,
             "max_frames_num": 5000,
         }
+        print(f"generate video kwargs: {kwargs}")
         video_out = pipe.generate(**kwargs)
     else:
         raise ValueError(f"Invalid task type: {args.task_type}")
@@ -186,7 +226,7 @@ if __name__ == "__main__":
 
     if local_rank == 0:
         current_time = time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime())
-        video_out_file = f"{args.prompt[:100].replace('/','')}_{args.seed}_{current_time}.mp4"
+        video_out_file = f"{args.seed}_{current_time}.mp4"
         output_path = os.path.join(save_dir, video_out_file)
         imageio.mimwrite(
             output_path,
@@ -196,19 +236,23 @@ if __name__ == "__main__":
             output_params=["-loglevel", "error"],
         )
         if args.task_type == "audio2video_single":
-            video_with_audio_path = video_out_file.replace(".mp4", "_with_audio.mp4")
+            video_with_audio_path = os.path.join(save_dir, video_out_file.replace(".mp4", "_with_audio.mp4"))
             audio_path = kwargs["input_data"]["video_audio"]
+            video_in = os.path.abspath(output_path)
+            audio_in = os.path.abspath(audio_path)
+            video_out_with_audio = os.path.abspath(video_with_audio_path)
+            print(f"video_in: {video_in}, audio_in: {audio_in}, video_out_with_audio: {video_out_with_audio}")
             # fmt: off
             cmd = [
                 'ffmpeg',
                 '-y',
-                '-i', f'"{video_out_file}"',
-                '-i', f'"{audio_path}"',
+                '-i', f'"{video_in}"',
+                '-i', f'"{audio_in}"',
                 '-map', '0:v',
                 '-map', '1:a',
                 '-c:v', 'copy',
                 '-shortest',
-                f'"{video_with_audio_path}"'
+                f'"{video_out_with_audio}"'
             ]
             # fmt: on
 
@@ -222,4 +266,7 @@ if __name__ == "__main__":
                 )
                 print(f"Video with audio generated successfully: {video_with_audio_path}")
             except subprocess.CalledProcessError as e:
-                print(f"Error occurred: {e}")
+                print(f"ffmpeg failed (exit={e.returncode}). Output:\n{e.stdout}")
+
+    if dist.is_available() and dist.is_initialized():
+        dist.destroy_process_group()

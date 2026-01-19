@@ -1,16 +1,13 @@
-# Copyright 2024-2025 The Alibaba Wan Team Authors. All rights reserved.
 import gc
-import importlib
 import logging
 import math
 import os
 import random
 import types
 from contextlib import contextmanager
-from copy import deepcopy
-from dataclasses import dataclass
+from safetensors.torch import load_file
 from functools import partial
-from typing import Any, Dict
+from typing import Dict
 
 import numpy as np
 import torch
@@ -92,30 +89,25 @@ class Audio2VideoSinglePipeline:
     def init_dit_model(
         cls,
         checkpoint_dir: str,
-        dit_path: str,
         quant: bool = False,
     ) -> Dict[str, WanModel]:
-        # Load DIT model
-        print(f"Start init dit model. checkpoint_dir: {checkpoint_dir}, dit_path: {dit_path}.")
-        if dit_path:
-            assert os.path.exists(dit_path), f"DIT model not found at {dit_path}"
+        print(f"load dit model from: {checkpoint_dir}")
+        state_dict = {}
+        for file in os.listdir(checkpoint_dir):
+            if file.endswith(".safetensors"):
+                state_dict.update(load_file(os.path.join(checkpoint_dir, file)))
 
-        if not dit_path:
-            model = WanModel.from_pretrained(checkpoint_dir, device="cpu", torch_dtype=torch.bfloat16)
-        elif os.path.exists(dit_path):
-            with torch.device("meta"):
-                model = WanModel.from_config(os.path.join(checkpoint_dir, "config.json")).to(torch.bfloat16)
-            ckpt = torch.load(dit_path, map_location="cpu", weights_only=True)
-            model.load_state_dict(ckpt, strict=True, assign=True)
-            print("load dit model from: ", dit_path)
-            del ckpt
-        else:
-            raise FileNotFoundError(f"DIT model not found at {dit_path}")
+        model = WanModel.from_config(os.path.join(checkpoint_dir, "config.json")).to(torch.bfloat16)
+        model.load_state_dict(state_dict, strict=True, assign=True)
+        del state_dict
+        gc.collect()
+        torch.cuda.empty_cache()
 
         model.eval().requires_grad_(False)
         model = model.to(torch.bfloat16)
         if quant:
             quantize_(model, float8_weight_only(), device="cuda")
+            print(f"quantize dit model")
 
         return {"model": model}
 
@@ -123,7 +115,6 @@ class Audio2VideoSinglePipeline:
         self,
         config,
         model_path: str,
-        dit_path: str = None,
         device_id=0,
         rank=0,
         use_usp=False,
@@ -132,25 +123,6 @@ class Audio2VideoSinglePipeline:
         offload=False,
         quant=False,
     ):
-        r"""
-        Initializes the image-to-video generation model components.
-
-        Args:
-            config (EasyDict):
-                Object containing model parameters initialized from config.py
-            checkpoint_dir (`str`):
-                Path to directory containing model checkpoints
-            device_id (`int`,  *optional*, defaults to 0):
-                Id of target GPU device
-            rank (`int`,  *optional*, defaults to 0):
-                Process rank for distributed training
-            t5_fsdp (`bool`, *optional*, defaults to False):
-                Enable FSDP sharding for T5 model
-            dit_fsdp (`bool`, *optional*, defaults to False):
-                Enable FSDP sharding for DiT model
-            use_usp (`bool`, *optional*, defaults to False):
-                Enable distribution strategy of USP.
-        """
         self.device = torch.device(f"cuda:{device_id}")
         self.config = config
         self.rank = rank
@@ -161,12 +133,10 @@ class Audio2VideoSinglePipeline:
 
         self.text_encoder = T5EncoderModel(
             text_len=config.text_len,
-            dtype=config.t5_dtype,
-            device=torch.device("cpu"),
             checkpoint_path=os.path.join(model_path, config.t5_checkpoint),
             tokenizer_path=os.path.join(model_path, config.t5_tokenizer),
             shard_fn=None,
-        )
+        ).to(config.t5_dtype).to("cpu")
         if quant:
             quantize_(self.text_encoder, float8_weight_only(), device="cuda")
 
@@ -181,16 +151,15 @@ class Audio2VideoSinglePipeline:
         self.patch_size = config.patch_size
         self.vae = WanVAE(
             vae_pth=os.path.join(model_path, config.vae_checkpoint),
-            # device=self.device,
         )
 
         # load dit model
         logging.info(f"Creating WanModel from {model_path}")
         self.model = self.init_dit_model(
             checkpoint_dir=model_path,
-            dit_path=dit_path,
             quant=quant,
         )["model"]
+        self.model.disable_teacache()
 
         if use_usp:
             from xfuser.core.distributed import get_sequence_parallel_world_size
@@ -225,15 +194,13 @@ class Audio2VideoSinglePipeline:
 
         self.offload = offload
         if self.offload:
-            # self.vae.to("cpu")
             self.model.to("cpu")
             self.text_encoder.to("cpu")
-            self.clip.to("cpu")
+            self.clip.model.to("cpu")
         else:
-            # self.vae.to(self.device)
             self.model.to(self.device)
             self.text_encoder.to(self.device)
-            self.clip.to(self.device)
+            self.clip.model.to(self.device)
         self.vae.to(self.device)
 
         if use_usp:
@@ -270,30 +237,11 @@ class Audio2VideoSinglePipeline:
         max_frames_num=5000,
         progress=True,
     ):
-        r"""
-        Generates video frames from input image and text prompt using diffusion process.
-
-        Args:
-            frame_num (`int`, *optional*, defaults to 81):
-                How many frames to sample from a video. The number should be 4n+1
-            shift (`float`, *optional*, defaults to 5.0):
-                Noise schedule shift parameter. Affects temporal dynamics
-                [NOTE]: If you want to generate a 480p video, it is recommended to set the shift value to 3.0.
-            sampling_steps (`int`, *optional*, defaults to 40):
-                Number of diffusion sampling steps. Higher values improve quality but slow generation
-            n_prompt (`str`, *optional*, defaults to ""):
-                Negative prompt for content exclusion. If not given, use `config.sample_neg_prompt`
-            seed (`int`, *optional*, defaults to -1):
-                Random seed for noise generation. If -1, use random seed
-            offload_model (`bool`, *optional*, defaults to True):
-                If True, offloads models to CPU during generation to save VRAM
-        """
         input_prompt = input_data["prompt"]
         cond_file_path = input_data["cond_image"]
         cond_image = Image.open(cond_file_path).convert("RGB")
 
         # decide a proper size
-        # TODO:
         if size_buckget == "multitalk-480":
             bucket_config = ASPECT_RATIO_627
         elif size_buckget == "multitalk-720":
@@ -342,8 +290,8 @@ class Audio2VideoSinglePipeline:
 
         if self.offload:
             self.text_encoder.to(self.device)
-        context, context_null, connection_embedding = self.text_encoder(
-            [input_prompt, n_prompt, connection_prompt], self.device
+        context, context_null, connection_embedding = self.text_encoder.encode(
+            [input_prompt, n_prompt, connection_prompt], 
         )
         if self.offload:
             self.text_encoder.to("cpu")
@@ -360,7 +308,6 @@ class Audio2VideoSinglePipeline:
         gen_video_list = []
 
         is_clip = False
-        # 保证滑窗下最后一个窗口也有81帧
         window_size = frame_num
         overlap = motion_frame + drop_frame
         video_length_real = min(max_frames_num, len(full_audio_embs[0]))
@@ -390,7 +337,6 @@ class Audio2VideoSinglePipeline:
         random.seed(seed)
         torch.backends.cudnn.deterministic = True
 
-        ######第一次生成的当作尾帧
         audio_embs = []
         # split audio with window size
         for human_idx in range(HUMAN_NUMBER):
@@ -424,23 +370,20 @@ class Audio2VideoSinglePipeline:
 
         # get mask
         msk = torch.ones(1, frame_num, lat_h, lat_w, device=self.device)
-        # if is_first_clip:
-        msk[:, cur_motion_frames_num:] = 0  ###生成一段当作尾帧
-        # else:
-        # msk[:, cur_motion_frames_num:-pseudo_frames.shape[2]] = 0 ###倒数第4帧
+        msk[:, cur_motion_frames_num:] = 0
         msk = torch.concat([torch.repeat_interleave(msk[:, 0:1], repeats=4, dim=1), msk[:, 1:]], dim=1)
         msk = msk.view(1, msk.shape[1] // 4, 4, lat_h, lat_w)
         msk = msk.transpose(1, 2).to(self.param_dtype)  # B 4 T H W
 
         with torch.no_grad():
             if self.offload:
-                self.clip.to(self.device)
+                self.clip.model.to(self.device)
             # get clip embedding
             clip_context = self.clip.visual(cond_image[:, :, :1, :, :]).to(
                 self.param_dtype
-            )  # torch.Size([1, 257, 1280])，一直取首帧
+            )
             if self.offload:
-                self.clip.to("cpu")
+                self.clip.model.to("cpu")
                 torch.cuda.empty_cache()
 
             video_frames = torch.zeros(
@@ -455,10 +398,11 @@ class Audio2VideoSinglePipeline:
                 f"cond_image:{cond_image.size()}, video_frames:{video_frames.size()}",
             )
 
-            y = self.vae.encode(padding_frames_pixels_values)
-            y = torch.stack(y).to(self.param_dtype)  # B C T H W
+            print(f"vae encode: padding_frames_pixels_values: {padding_frames_pixels_values.shape}")
+            y = self.vae.encode(padding_frames_pixels_values).to(self.param_dtype)
+            print(f"vae encode: y: {y.shape}")
             cur_motion_frames_latent_num = int(1 + (cur_motion_frames_num - 1) // 4)
-            latent_motion_frames = y[:, :, :cur_motion_frames_latent_num][0]  # C T H W ##latent层面的motion frames
+            latent_motion_frames = y[:, :, :cur_motion_frames_latent_num][0]
             y = torch.concat([msk, y], dim=1)  # B 4+C T H W
             del video_frames, padding_frames_pixels_values
 
@@ -542,7 +486,6 @@ class Audio2VideoSinglePipeline:
 
             progress_wrap = partial(tqdm, total=len(timesteps) - 1) if progress else (lambda x: x)
             for i in progress_wrap(range(len(timesteps) - 1)):
-                # print(timesteps)
                 timestep = timesteps[i]
                 latent_model_input = [latent.to(self.device)]
                 (
@@ -608,13 +551,14 @@ class Audio2VideoSinglePipeline:
                 self.model.to("cpu")
                 torch.cuda.empty_cache()
 
-            videos = self.vae.decode(x0)
+            print(f"vae decode: x0: {x0[0].shape}")
+            videos = self.vae.decode(x0[0])
+            print(f"vae decode: videos: {videos.shape}")
             torch.cuda.empty_cache()
 
         # cache generated samples
-        generated_ref_videos = torch.stack(videos)  # B C T H W
+        generated_ref_videos = videos
 
-        # print("color correction for generated_ref_videos")
         generated_ref_videos = match_and_blend_colors(generated_ref_videos, original_color_reference, 1.0)
         if self.rank == 0:
             processed_generated_ref_videos = process_video_samples(generated_ref_videos)
@@ -624,38 +568,26 @@ class Audio2VideoSinglePipeline:
         del videos
 
         if not is_clip:
-            # generate_idx计算
             audio_length = min(max_frames_num, len(full_audio_embs[0]))
             if audio_length <= frame_num:
-                # 当长度小于等于frame_num时，取首尾帧
                 generate_idx = [0, audio_length - 1]
             else:
-                # 当长度大于frame_num时，分段取idx
-                generate_idx = [0]  # 第一个idx总是0
-                # 第一段：frame_num帧，所以下一个idx是frame_num-1
+                generate_idx = [0]
                 current_idx = frame_num - 1
-                # 后续段落的间隔
                 segment_interval = frame_num - motion_frame - drop_frame
-                # 继续添加后续段落的idx
                 while current_idx < audio_length - 1:
                     generate_idx.append(current_idx)
                     current_idx += segment_interval
-                # 确保最后一个idx是audio_length-1（如果还没有添加的话）
                 if generate_idx[-1] != audio_length - 1:
                     generate_idx.append(audio_length - 1)
             generate_idx = np.array(generate_idx, dtype=np.int16)
-            print(f"原始generate_idx: {generate_idx}")
-
-            # 将generate_idx的值按照比例映射到[0, frame_num-1]范围内
             original_max = generate_idx[-1]
             original_min = generate_idx[0]
             if original_max > original_min:
-                # 使用浮点数计算避免溢出，然后取整并限制在有效范围内
                 generate_idx_float = (
                     (generate_idx.astype(np.float64) - original_min) * (frame_num - 1) / (original_max - original_min)
                 )
                 generate_idx = np.clip(np.round(generate_idx_float), 0, frame_num - 1).astype(np.int32)
-            print(f"映射后generate_idx: {generate_idx}")
 
             generate_idx = generate_idx[1:]
             generated_ref_videos_final = generated_ref_videos[:, :, generate_idx]
@@ -705,7 +637,6 @@ class Audio2VideoSinglePipeline:
                     device=self.device,
                 )
 
-                ####每次都更新pseudo_frames
                 tmp_indx = min(tmp_indx, generated_ref_videos_final.shape[2] - 1)
                 print(f"use tmp_indx:{tmp_indx}, final:{generated_ref_videos_final.shape[2]-1}")
                 pseudo_frames = (
@@ -715,7 +646,7 @@ class Audio2VideoSinglePipeline:
 
                 # get mask
                 msk = torch.ones(1, frame_num, lat_h, lat_w, device=self.device)
-                msk[:, cur_motion_frames_num : -pseudo_frames.shape[2]] = 0  ###倒数第4帧
+                msk[:, cur_motion_frames_num : -pseudo_frames.shape[2]] = 0
                 msk = torch.concat(
                     [
                         torch.repeat_interleave(msk[:, 0:1], repeats=4, dim=1),
@@ -735,12 +666,12 @@ class Audio2VideoSinglePipeline:
                         audio_start_idx,
                     )
                     if self.offload:
-                        self.clip.to(self.device)
+                        self.clip.model.to(self.device)
                     clip_context = self.clip.visual(cond_image[:, :, :1, :, :]).to(
                         self.param_dtype
-                    )  # torch.Size([1, 257, 1280])，一直取首帧
+                    ) 
                     if self.offload:
-                        self.clip.to("cpu")
+                        self.clip.model.to("cpu")
                         torch.cuda.empty_cache()
 
                     video_frames = torch.zeros(
@@ -752,12 +683,11 @@ class Audio2VideoSinglePipeline:
                     ).to(self.device)
                     padding_frames_pixels_values = torch.concat([cond_image, video_frames, pseudo_frames], dim=2)
 
-                    y = self.vae.encode(padding_frames_pixels_values)
-                    y = torch.stack(y).to(self.param_dtype)  # B C T H W
+                    y = self.vae.encode(padding_frames_pixels_values).to(self.param_dtype)
                     cur_motion_frames_latent_num = int(1 + (cur_motion_frames_num - 1) // 4)
                     latent_motion_frames = y[:, :, :cur_motion_frames_latent_num][
                         0
-                    ]  # C T H W ##latent层面的motion frames
+                    ]  # C T H W 
                     y = torch.concat([msk, y], dim=1)  # B 4+C T H W
                     del video_frames, padding_frames_pixels_values
 
@@ -938,15 +868,13 @@ class Audio2VideoSinglePipeline:
                         self.model.to("cpu")
                         torch.cuda.empty_cache()
 
-                    videos = self.vae.decode(x0)
+                    videos = self.vae.decode(x0[0])
                     torch.cuda.empty_cache()
 
                 # cache generated samples
-                videos = torch.stack(videos)  # B C T H W
                 if not arrive_last_frame:
                     videos = videos[:, :, :-drop_frame]
 
-                # print("START OF COLOR CORRECTION STEP")
                 videos = match_and_blend_colors(videos, original_color_reference, 1.0)
                 if self.rank == 0:
                     processed_videos = process_video_samples(videos)
@@ -957,7 +885,6 @@ class Audio2VideoSinglePipeline:
                 if self.rank == 0:
                     if not is_first_clip:
                         gen_video_list.append(processed_videos[:, :, cur_motion_frames_num:])
-                        # gen_video_list.append(processed_video[cur_motion_frames_num:])
                     else:
                         gen_video_list.append(processed_videos)
 
@@ -989,13 +916,18 @@ class Audio2VideoSinglePipeline:
             gen_video_samples = torch.cat(gen_video_list, dim=2)[:, :, : int(max_frames_num)]
             print(f"gen_video_samples: {gen_video_samples.size()}, video_length_real: {video_length_real}")
             gen_video_samples = gen_video_samples[:, :, :video_length_real]
-            # gen_video_samples = gen_video_samples[:video_length_real]
             print(f"gen_video_samples: {gen_video_samples.size()}")
+            gen_video_samples = (
+                gen_video_samples[0]  # (C, T, H, W)
+                .permute(1, 2, 3, 0)  # (T, H, W, C)
+                .contiguous()
+                .cpu()
+                .numpy()
+            )
 
         if dist.is_initialized():
             dist.barrier()
 
         del noise, latent
-        self.vae.model.to("cpu")
 
-        return gen_video_samples[0] if self.rank == 0 else None
+        return gen_video_samples if self.rank == 0 else None

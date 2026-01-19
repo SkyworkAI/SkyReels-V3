@@ -31,7 +31,7 @@ def normalize_and_scale(column, source_range, target_range, epsilon=1e-8):
     return scaled
 
 
-@torch.compile
+# @torch.compile
 def calculate_x_ref_attn_map(visual_q, ref_k, ref_target_masks, mode="mean", attn_bias=None):
 
     ref_k = ref_k.to(visual_q.dtype).to(visual_q.device)

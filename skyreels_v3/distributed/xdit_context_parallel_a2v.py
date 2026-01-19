@@ -250,9 +250,7 @@ def usp_attn_forward_multitalk(
 
     from yunchang.kernels import AttnType
 
-    from ..modules.attention import SAGEATTN_AVAILABLE
-
-    attn_type = AttnType.SAGE_AUTO if SAGEATTN_AVAILABLE else AttnType.FA
+    attn_type = AttnType.FA
 
     x = xFuserLongContextAttention(attn_type=attn_type, use_pack_qkv=True)(
         None, query=half(q), key=half(k), value=half(v), window_size=self.window_size
@@ -292,7 +290,6 @@ def optimized_gather_after(x: torch.Tensor, N_t: int) -> torch.Tensor:
     return x
 
 
-@timed(name="usp_cross_attn", print_each_call=False)
 def usp_crossattn_multi_forward_multitalk(
     self,
     x: torch.Tensor,

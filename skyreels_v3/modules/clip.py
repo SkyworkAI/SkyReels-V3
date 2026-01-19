@@ -485,7 +485,7 @@ def clip_xlm_roberta_vit_h_14(pretrained=False, pretrained_name="open-clip-xlm-r
     return _clip(pretrained, pretrained_name, XLMRobertaCLIP, **cfg)
 
 
-class CLIPModel(ModelMixin):
+class CLIPModel():
     def __init__(self, dtype, device, checkpoint_path, tokenizer_path):
         self.dtype = dtype
         self.device = device

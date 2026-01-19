@@ -498,7 +498,7 @@ class WanAttentionBlock(nn.Module):
         )
         self.norm_x = WanLayerNorm(dim, eps, elementwise_affine=True) if norm_input_visual else nn.Identity()
 
-    @torch.compile(dynamic=True)
+    # @torch.compile(dynamic=True)
     def forward(
         self,
         x,
