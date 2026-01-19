@@ -137,7 +137,7 @@ torchrun --nproc_per_node=4 generate_video.py --task_type shot_switching_extensi
 > 💡Note: 
 > * The ***task_type*** parameter must be set to "shot_switching_extension".
 > * The **input_video** parameter specifies the source video to be extended, and the **duration** parameter is therefore limited to a maximum of 5 seconds.
-> * The model supports various cinematography transitions such as "Cut-In" and "Cut-Away". For optimal output, consider using an LLM to integrate these techniques into well-structured generation prompts.
+> * To effectively utilize the supported cinematography types ("Cut-In", "Cut-Out", "Shot/Reverse Shot", "Multi-Angle", "Cut Away"), you can use a Large Language Model (LLM) to craft and optimize your generation prompts, ensuring clear and precise creative direction.
 
 #### Talking Avatar
 The Talking Avatar model generates vibrant, lifelike talking avatars from a single portrait image and an audio clip, supporting videos of up to 200 seconds in length. It is capable of producing multi-avatar scenes, adapting to diverse artistic styles, and delivering performances with rich expressiveness and precise synchronization.
