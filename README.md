@@ -149,6 +149,73 @@ The Talking Avatar model generates vibrant, lifelike talking avatars from a sing
 ```bash
 ```
 
+## Introduction of SkyReels-V3
+
+### Reference to Video
+SkyReels-V3 Multi-Reference Video Generation Model is a new-generation video synthesis system independently developed by SkyReels. The model enables users to input 1 to 4 reference images—including character portraits, object images, and background scenes—and generates coherent video sequences aligned with textual instructions, ensuring logical compositional relationships and narrative progression. With robust capabilities in dynamic scene generation, the model is widely applicable across various domains such as video production, social media entertainment, live-stream commerce, and product demonstration.
+
+
+> Key Features :
+> * Supports fusion of up to 4 reference images, including character, object, and background references.
+> * Exceptional subject consistency and composition coherence, with industry-leading motion generation quality.
+> * Multiple aspect ratios: 1:1, 3:4, 4:3, 16:9, 9:16.
+
+#### Model Overview
+The model achieves high subject and background consistency while accurately responding to user instructions. To enhance its capability of preserving reference image content, the SkyReels team developed a comprehensive data processing pipeline. This pipeline employs a cross-frame pairing strategy to select reference frames from continuous video sequences and utilizes image editing models to extract subject images, simultaneously accomplishing background completion and semantic rewriting—effectively avoiding the "copy-paste" effect.
+
+During the training phase, the SkyReels team introduced an image-video hybrid training mechanism and supported multi-resolution joint training, significantly improving the model's generalization performance. Evolving from the SkyReels V2 to the V3 version, the model has reached the level of industry-leading closed-source SOTA (state-of-the-art) models across multiple evaluation metrics, demonstrating top-tier comprehensive generation capabilities in the field.
+
+#### 📊 Performance Comparison
+
+| Model | Reference Consistency ↑ | Instruction Following ↑ | Visual Quality ↑ |
+|-------|-------------------------|-------------------------|------------------|
+| Vidu Q2 | 0.5961 | 27.84 | 0.7877 |
+| Kling | 0.6630 | 29.23 | 0.8034 |
+| PixVerse | 0.6542 | 29.34 | 0.7976 |
+| **SkyReels-V3** | **0.6698** | **27.22** | **0.8119** |
+
+### Video Extension
+
+SkyReels-V3 Video Extension Model is a new-generation video generation system independently developed by SkyReels. The model allows users to input an existing video segment and extend it with coherent, logically consistent subsequent scenes based on textual instructions. It is widely applicable in scenarios such as video production, short-form series creation, live commerce, and product demonstration.
+
+> Key Features :
+> * Dual Extension Modes: Supports both single-shot continuation and multi-shot switching (with 5 transition types), operable via manual selection or automatic detection.
+> * Superior Visual Quality: Excellent aesthetic composition, robust motion quality, and seamless continuity preservation.
+> * Outstanding Style Adherence: Strictly follows input visual styles (realistic, cinematic, or specialized aesthetics) with exceptional compatibility.
+> * High-Definition Output: Ensures premium content quality, supporting 720P resolution.
+> * Flexible Duration Control: Adjustable output length between 5 to 30 seconds for sing-shot video extension.
+> * Customizable Aspect Ratios: Supports multiple ratios including 1:1, 3:4, 4:3, 16:9, and 9:16.
+
+#### Model Overview
+The SkyReels-V3 Video Extension Engine deeply integrates spatiotemporal consistency modeling with large-scale video understanding, breaking through the frame-level limitations of traditional video generation to achieve a qualitative leap from "visual continuation" to "narrative continuation." As the industry's first engine supporting intelligent shot switching during video extension, SkyReels-V3 not only achieves top-tier temporal coherence but also extends generation capacity to minute-level durations through an innovative history enhancement mechanism, ensuring depth and stability in long-form video storytelling. 
+
+The engine accurately parses scene semantics, motion trajectories, and emotional context from the original video, while intelligently planning the composition, character behavior, and cinematography of the extended content. It supports both seamless single-shot continuation and multi-type shot switching—including professional techniques such as Cut-In, Cut-Out, Reverse Shot, Multi-Angle, and Cut Away—automatically generating extended clips with strong narrative logic and visual coherence. This empowers visual language with cinematic dynamism and tension, marking a true generational shift from frame interpolation to plot creation.
+
+Technical Innovations:
+- Unified multi-segment positional encoding and hybrid hierarchical data training enable precise motion prediction and smooth transitions in complex scenes.
+- A novel fusion of token concatenation flexibility and channel concatenation efficiency significantly reduces total token count while enhancing computational performance without compromising output quality.
+- The architecture robustly handles challenges such as rapid motion, multi-person interactions, and abrupt scene changes, strictly ensuring physical plausibility and emotional consistency.
+- In intelligent shot switching, the system dynamically plans cut rhythms and viewpoint variations based on video semantics and user prompts, generating freely lengthened, professionally shot-extended content within a unified style.
+
+With outstanding generalization capabilities, SkyReels-V3 achieves state-of-the-art (SOTA) performance on core metrics including single-shot and multi-shot extension. It is widely adaptable to diverse scenarios such as live-action filmmaking, short-series industrial production, game cinematics, and security footage enhancement. The generated content delivers high-definition visuals, sharp details, and natural motion fluency, offering professional creators a "what-you-see-is-what-you-think" extension experience and redefining the boundaries of video generation.
+
+### Talking Avatar
+
+The SkyReels-V3 Talking Avatar Model is an innovative AI system that transforms static portrait images into dynamic, speaking personas through advanced audio-visual synthesis technology. This model excels at generating realistic lip synchronization, natural facial expressions, and lifelike head movements, creating engaging talking avatar experiences from single reference images and audio inputs.
+
+> Key Features :
+> * High-fidelity lip synchronization with natural speech patterns
+> * Preservation of identity and facial characteristics from reference images
+> * Support for multiple languages and diverse speaking styles
+> * Realistic facial expressions and micro-movements
+> * Customizable avatar personalities and emotional expressions
+> * High-resolution output with cinematic quality
+
+#### Model Overview
+The SkyReels-V3 Talking Avatar Engine leverages state-of-the-art multimodal deep learning architectures to achieve seamless audio-visual alignment. The model processes reference portrait images and audio clips to generate temporally coherent video sequences where the avatar naturally speaks the provided audio content while maintaining visual fidelity and emotional authenticity.
+
+The system incorporates advanced techniques in facial landmark detection, expression mapping, and audio-driven animation synthesis. Through sophisticated temporal modeling and identity preservation mechanisms, the model ensures that generated avatars maintain consistent appearance while exhibiting natural speaking behaviors and appropriate emotional responses aligned with the audio content.
+
 ## Acknowledgements
 We would like to thank the contributors of <a href="https://github.com/Wan-Video/Wan2.1">Wan 2.1</a>, <a href="https://github.com/xdit-project/xDiT">XDit</a> and <a href="https://github.com/huggingface/diffusers">diffusers</a> repositories, for their open research and contributions.
 
