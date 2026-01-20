@@ -150,6 +150,10 @@ torchrun --nproc_per_node=1 generate_video.py --task_type talking_avatar --promp
 ```bash
 torchrun --nproc_per_node=4 generate_video.py --task_type talking_avatar --prompt "A young girl's eyes kept following the camera, singing with a mysterious expression. Surrounded by rich blooming florals, the camera cranes up slowly to reveal the full surreal, luxurious scene." --seed 42 --use_usp --offload --input_image "https://skyreels-api.oss-accelerate.aliyuncs.com/examples/talking_avatar_video/single1.png" --input_audio "https://skyreels-api.oss-accelerate.aliyuncs.com/examples/talking_avatar_video/single_actor/huahai_5s.mp3"
 ```
+> 💡Note: 
+> * The ***task_type*** parameter must be set to "talking_avatar".
+> * The **input_image** parameter specifies the first-frame image for talking avatar generation (URL or local path). Supported formats: **jpg/jpeg, png, gif, bmp**.
+> * The **input_audio** parameter specifies the driving audio (URL or local path). Currently supports **1 audio**. Supported formats: **mp3, wav**. Audio duration: **<= 200 seconds**.
 
 ## Introduction of SkyReels-V3
 
