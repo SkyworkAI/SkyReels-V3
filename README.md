@@ -235,7 +235,7 @@ In internal evaluations against mainstream avatar models, SkyReels model excel a
 | **SkyReels V3** | 8.18 | **4.60** | 0.80 |
 
 ## Acknowledgements
-We would like to thank the contributors of <a href="https://github.com/Wan-Video/Wan2.1">Wan 2.1</a>, <a href="https://github.com/xdit-project/xDiT">XDit</a> and <a href="https://github.com/huggingface/diffusers">diffusers</a> repositories, for their open research and contributions.
+We would like to thank the contributors of <a href="https://github.com/Wan-Video/Wan2.1">Wan 2.1</a>, <a href="https://github.com/MeiGen-AI/MultiTalk">MultiTalk</a>, <a href="https://github.com/xdit-project/xDiT">XDit</a> and <a href="https://github.com/huggingface/diffusers">diffusers</a> repositories, for their open research and contributions.
 
 ## Github Star History
 
