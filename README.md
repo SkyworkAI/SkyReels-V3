@@ -5,7 +5,7 @@
 <h1 align="center">SkyReels V3: Multimodal Video Generation Model</h1> 
 
 <p align="center">
-👋 <a href="https://www.skyreels.ai/" target="_blank">Playground</a> · 🤗 <a href="https://huggingface.co/collections/Skywork/skyreels-v3" target="_blank">Hugging Face</a> · 🤖 <a href="https://www.modelscope.cn/collections/SkyReels-V2-f665650130b144" target="_blank">ModelScope</a>
+👋 <a href="https://www.skyreels.ai/" target="_blank">Playground</a> · 🤗 <a href="https://huggingface.co/collections/Skywork/skyreels-v3" target="_blank">Hugging Face</a> · 🤖 <a href="https://www.modelscope.cn/collections/Skywork/SkyReels-V3" target="_blank">ModelScope</a>
 </p>
 
 ---
@@ -74,17 +74,17 @@ You can download our models from Hugging Face:
     <tr>
       <td>Reference to Video</td>
       <td>14B-720P</td>
-      <td>🤗 <a href="https://huggingface.co/Skywork/SkyReels-V3-R2V-14B">Huggingface</a> 🤖 <a href="#">ModelScope</a></td>
+      <td>🤗 <a href="https://huggingface.co/Skywork/SkyReels-V3-R2V-14B">Huggingface</a> 🤖 <a href="www.modelscope.cn/models/Skywork/SkyReels-V3-R2V-14B">ModelScope</a></td>
     </tr>
     <tr>
       <td>Video Extension</td>
       <td>14B-720P</td>
-      <td>🤗 <a href="https://huggingface.co/Skywork/SkyReels-V3-V2V-14B">Huggingface</a> 🤖 <a href="#">ModelScope</a></td>
+      <td>🤗 <a href="https://huggingface.co/Skywork/SkyReels-V3-V2V-14B">Huggingface</a> 🤖 <a href="www.modelscope.cn/models/Skywork/SkyReels-V3-V2V-14B">ModelScope</a></td>
     </tr>
     <tr>
       <td>Talking Avatar</td>
       <td>19B-720P</td>
-      <td>🤗 <a href="https://huggingface.co/Skywork/SkyReels-V3-A2V-19B">Huggingface</a> 🤖 <a href="#">ModelScope</a></td>
+      <td>🤗 <a href="https://huggingface.co/Skywork/SkyReels-V3-A2V-19B">Huggingface</a> 🤖 <a href="www.modelscope.cn/models/Skywork/SkyReels-V3-A2V-19B">ModelScope</a></td>
     </tr>
   </tbody>
 </table>
@@ -144,7 +144,7 @@ torchrun --nproc_per_node=4 generate_video.py --task_type shot_switching_extensi
 The Talking Avatar model generates vibrant, lifelike talking avatars from a single portrait image and an audio clip, supporting videos of up to 200 seconds in length. It is capable of producing multi-avatar scenes, adapting to diverse artistic styles, and delivering performances with rich expressiveness and precise synchronization.
 - Single-GPU inference
 ```bash
-torchrun --nproc_per_node=1 generate_video.py --task_type talking_avatar --prompt "A young girl's eyes kept following the camera, singing with a mysterious expression. Surrounded by rich blooming florals, the camera cranes up slowly to reveal the full surreal, luxurious scene." --seed 42 --offload --input_image "https://skyreels-api.oss-accelerate.aliyuncs.com/examples/talking_avatar_video/single1.png" --input_audio "https://skyreels-api.oss-accelerate.aliyuncs.com/examples/talking_avatar_video/single_actor/huahai_5s.mp3"
+python3 generate_video.py --task_type talking_avatar --prompt "A young girl's eyes kept following the camera, singing with a mysterious expression. Surrounded by rich blooming florals, the camera cranes up slowly to reveal the full surreal, luxurious scene." --seed 42 --offload --input_image "https://skyreels-api.oss-accelerate.aliyuncs.com/examples/talking_avatar_video/single1.png" --input_audio "https://skyreels-api.oss-accelerate.aliyuncs.com/examples/talking_avatar_video/single_actor/huahai_5s.mp3"
 ```
 - Multi-GPU inference using xDiT USP
 ```bash

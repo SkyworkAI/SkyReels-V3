@@ -10,9 +10,6 @@ from .t5 import T5EncoderModel
 from .transformer import WanModel
 from .vae import WanVAE
 
-# from torchao.quantization import float8_weight_only
-# from torchao.quantization import quantize_
-
 
 def download_model(model_id):
     if not os.path.exists(model_id):
@@ -51,8 +48,6 @@ def get_transformer(
 
     transformer.requires_grad_(False)
     transformer.eval()
-    # quantize_(transformer, float8_weight_only(), device="cuda")
-    # transformer.to(device)
     gc.collect()
     torch.cuda.empty_cache()
     return transformer
@@ -71,8 +66,6 @@ def get_text_encoder(
     )
     text_encoder.requires_grad_(False)
     text_encoder.eval()
-    # quantize_(text_encoder, float8_weight_only(), device="cuda")
-    #text_encoder.to(device)
     gc.collect()
     torch.cuda.empty_cache()
     return text_encoder

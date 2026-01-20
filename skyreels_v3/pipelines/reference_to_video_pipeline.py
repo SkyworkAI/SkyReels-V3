@@ -729,12 +729,6 @@ class ReferenceToVideoPipeline:
         self.offload = offload
         self.device = device
 
-        # hardcode for testing
-        # from torchao.quantization import float8_weight_only, quantize_
-
-        # quantize_(self.pipeline.transformer, float8_weight_only(), device=device)
-        # self.pipeline.transformer.to(load_device)
-
         if self.use_usp:
             from ..distributed.context_parallel_for_reference import (
                 parallelize_transformer,
