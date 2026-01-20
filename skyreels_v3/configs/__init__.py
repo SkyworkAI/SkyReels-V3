@@ -4,8 +4,8 @@ import os
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-from .wan_multitalk_14B import multitalk_14B
+from .talking_avatar_19B import talking_avatar_19B
 
 WAN_CONFIGS = {
-    "multitalk-14B": multitalk_14B,
+    "talking-avatar-19B": talking_avatar_19B,
 }

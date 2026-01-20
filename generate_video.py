@@ -224,7 +224,7 @@ if __name__ == "__main__":
         pipe = ReferenceToVideoPipeline(model_path=args.model_id, use_usp=args.use_usp, offload=args.offload)
         video_out = pipe.generate_video(args.ref_imgs, args.prompt, args.duration, args.seed)
     elif args.task_type == "talking_avatar":
-        config = WAN_CONFIGS["multitalk-14B"]
+        config = WAN_CONFIGS["talking-avatar-19B"]
         pipe = TalkingAvatarPipeline(
             config=config,
             model_path=args.model_id,
@@ -251,7 +251,7 @@ if __name__ == "__main__":
             input_data, _ = preprocess_audio(args.model_id, input_data, "processed_audio")
         kwargs = {
             "input_data": input_data,
-            "size_buckget": "multitalk-720",
+            "size_buckget": "talking-avatar-720",
             "motion_frame": 5,
             "frame_num": 81,
             "drop_frame": 12,

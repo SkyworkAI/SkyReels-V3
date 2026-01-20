@@ -45,7 +45,7 @@ def rope_apply(x, grid_sizes, freqs):
     return torch.stack(output)
 
 
-def usp_dit_forward_multitalk(
+def usp_dit_forward_avatar(
     self,
     x,
     t,
@@ -55,7 +55,6 @@ def usp_dit_forward_multitalk(
     y=None,
     audio=None,
     ref_target_masks=None,
-    # MultiTalk model parameters
     audio_mask=None,
 ):
     """
@@ -195,7 +194,7 @@ def usp_dit_forward_multitalk(
     return torch.stack(x)
 
 
-def usp_attn_forward_multitalk(
+def usp_attn_forward_avatar(
     self, x, seq_lens, grid_sizes, freqs, dtype=torch.bfloat16, ref_target_masks=None, human_num=None
 ):
     b, s, n, d = *x.shape[:2], self.num_heads, self.head_dim
@@ -257,7 +256,7 @@ def optimized_gather_after(x: torch.Tensor, N_t: int) -> torch.Tensor:
     return x
 
 
-def usp_crossattn_multi_forward_multitalk(
+def usp_crossattn_multi_forward_avatar(
     self,
     x: torch.Tensor,
     encoder_hidden_states: torch.Tensor,  # 1, 21, 64, C

@@ -159,18 +159,18 @@ class TalkingAvatarPipeline:
             from xfuser.core.distributed import get_sequence_parallel_world_size
 
             from ..distributed.context_parallel_for_avatar import (
-                usp_attn_forward_multitalk,
-                usp_crossattn_multi_forward_multitalk,
-                usp_dit_forward_multitalk,
+                usp_attn_forward_avatar,
+                usp_crossattn_multi_forward_avatar,
+                usp_dit_forward_avatar,
             )
 
             for block in self.model.blocks:
-                block.self_attn.forward = types.MethodType(usp_attn_forward_multitalk, block.self_attn)
+                block.self_attn.forward = types.MethodType(usp_attn_forward_avatar, block.self_attn)
                 block.audio_cross_attn.origin_forward = block.audio_cross_attn.forward
                 block.audio_cross_attn.forward = types.MethodType(
-                    usp_crossattn_multi_forward_multitalk, block.audio_cross_attn
+                    usp_crossattn_multi_forward_avatar, block.audio_cross_attn
                 )
-            self.model.forward = types.MethodType(usp_dit_forward_multitalk, self.model)
+            self.model.forward = types.MethodType(usp_dit_forward_avatar, self.model)
             self.sp_size = get_sequence_parallel_world_size()
             local_rank = dist.get_rank() % torch.cuda.device_count()
             torch.cuda.set_device(local_rank)
@@ -217,7 +217,7 @@ class TalkingAvatarPipeline:
     def generate(
         self,
         input_data,
-        size_buckget="multitalk-480",
+        size_buckget="talking-avatar-480",
         motion_frame=25,
         drop_frame=12,
         frame_num=81,
@@ -236,9 +236,9 @@ class TalkingAvatarPipeline:
         cond_image = Image.open(cond_file_path).convert("RGB")
 
         # decide a proper size
-        if size_buckget == "multitalk-480":
+        if size_buckget == "talking-avatar-480":
             bucket_config = ASPECT_RATIO_627
-        elif size_buckget == "multitalk-720":
+        elif size_buckget == "talking-avatar-720":
             bucket_config = ASPECT_RATIO_960
         else:
             raise ValueError("Unsupported size bucket: {}".format(size_buckget))

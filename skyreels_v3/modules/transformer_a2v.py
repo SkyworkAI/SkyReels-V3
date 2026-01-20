@@ -696,7 +696,7 @@ class WanModel(ModelMixin, ConfigMixin):
     ):
         super().__init__()
 
-        assert model_type == "i2v", "MultiTalk model requires your model_type is i2v."
+        assert model_type == "i2v", "requires your model_type is i2v."
         self.model_type = model_type
 
         self.patch_size = patch_size
@@ -786,7 +786,6 @@ class WanModel(ModelMixin, ConfigMixin):
         y=None,
         audio=None,
         ref_target_masks=None,
-        # MultiTalk model parameters
         audio_mask=None,
     ):
         assert clip_fea is not None and y is not None
