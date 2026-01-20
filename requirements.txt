@@ -13,3 +13,9 @@ flash_attn==2.7.4.post1
 numpy==1.26.4
 xfuser==0.4.3.post3
 yunchang==0.6.3.post1
+easydict
+pyloudnorm
+librosa
+moviepy==2.2.1
+omegaconf==2.3.0
+kornia
