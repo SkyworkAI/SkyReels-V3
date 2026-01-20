@@ -170,9 +170,9 @@ During the training phase, the SkyReels team introduced an image-video hybrid tr
 | Model | Reference Consistency ↑ | Instruction Following ↑ | Visual Quality ↑ |
 |-------|-------------------------|-------------------------|------------------|
 | Vidu Q2 | 0.5961 | 27.84 | 0.7877 |
-| Kling | 0.6630 | 29.23 | 0.8034 |
-| PixVerse | 0.6542 | 29.34 | 0.7976 |
-| **SkyReels-V3** | **0.6698** | **27.22** | **0.8119** |
+| Kling 1.6 | 0.6630 | 29.23 | 0.8034 |
+| PixVerse V5 | 0.6542 | 29.34 | 0.7976 |
+| **SkyReels V3** | **0.6698** | **27.22** | **0.8119** |
 
 ### Video Extension
 
@@ -201,20 +201,32 @@ With outstanding generalization capabilities, SkyReels-V3 achieves state-of-the-
 
 ### Talking Avatar
 
-The SkyReels-V3 Talking Avatar Model is an innovative AI system that transforms static portrait images into dynamic, speaking personas through advanced audio-visual synthesis technology. This model excels at generating realistic lip synchronization, natural facial expressions, and lifelike head movements, creating engaging talking avatar experiences from single reference images and audio inputs.
+Create with just one image and audio clip.
 
 > Key Features :
-> * High-fidelity lip synchronization with natural speech patterns
-> * Preservation of identity and facial characteristics from reference images
-> * Support for multiple languages and diverse speaking styles
-> * Realistic facial expressions and micro-movements
-> * Customizable avatar personalities and emotional expressions
-> * High-resolution output with cinematic quality
+> * Superior visual quality and precise lip sync. Generate 720p HD videos at 24 fps for smooth and clear results. Supports multiple languages to ensure lip movements match the audio, enhancing authenticity.
+> * Multi-style support. Compatible with real-life, cartoon, animal, and stylized characters—offering creative flexibility for brand ambassadors or virtual IPs.
+> * Long-form video generation. Produce minute-long coherent videos for detailed explanations, news reports, training courses, and more.
+> * Multi-character scenes. Optimized for group interactions, allowing role assignments to support dialogues, interviews, and other dynamic content.
 
 #### Model Overview
-The SkyReels-V3 Talking Avatar Engine leverages state-of-the-art multimodal deep learning architectures to achieve seamless audio-visual alignment. The model processes reference portrait images and audio clips to generate temporally coherent video sequences where the avatar naturally speaks the provided audio content while maintaining visual fidelity and emotional authenticity.
 
-The system incorporates advanced techniques in facial landmark detection, expression mapping, and audio-driven animation synthesis. Through sophisticated temporal modeling and identity preservation mechanisms, the model ensures that generated avatars maintain consistent appearance while exhibiting natural speaking behaviors and appropriate emotional responses aligned with the audio content.
+Powered by advanced multimodal understanding techniques, SkyReels Avatars don’t just “hear sound”—they truly understand your content. By analyzing voice, image, and emotional cues, they generate expressions, movements, and camera language that naturally align with your intent.
+Built on a scalable diffusion Transformer architecture and trained with audio-visual alignment strategies, our technology ensures highly accurate lip sync. Whether it’s Chinese, English, Korean, singing, or fast-paced dialogue—the lip movements match the pronunciation for a realistic audiovisual experience.
+
+Using a keyframe-constrained generation framework, the model first structures key content before smoothly connecting transitions. This ensures consistent character appearance and fluid motion, even in long videos. Generate high-quality minute-long videos in one go—ideal for explanations, broadcasts, storytelling, and more.
+From real people and anime characters to pets and artwork—any image can be turned into a lifelike digital avatar.
+
+In internal evaluations against mainstream avatar models, SkyReels model excel across multiple dimensions—overall quality, lip sync, and expressiveness—achieving a significantly higher overall rating.
+
+#### 📊 Performance Comparison
+
+| Model | Audio-Visual Sync ↑ | Visual Quality ↑ | Charactr Consistency ↑ |
+|-------|-------------------------|-------------------------|------------------|
+| OmniHuman | **8.25** | 4.60 | **0.81** |
+| Kling | 8.01 | 4.55 | 0.78 |
+| HunyuanAvatar | 6.72 | 4.50 | 0.74 |
+| **SkyReels V3** | 8.18 | **4.60** | 0.80 |
 
 ## Acknowledgements
 We would like to thank the contributors of <a href="https://github.com/Wan-Video/Wan2.1">Wan 2.1</a>, <a href="https://github.com/xdit-project/xDiT">XDit</a> and <a href="https://github.com/huggingface/diffusers">diffusers</a> repositories, for their open research and contributions.
