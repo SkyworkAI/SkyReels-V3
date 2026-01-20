@@ -147,7 +147,6 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--use_usp", action="store_true")
     parser.add_argument("--offload", action="store_true")
-    parser.add_argument("--quant", action="store_true")
     parser.add_argument(
         "--input_video",
         type=str,
@@ -233,7 +232,6 @@ if __name__ == "__main__":
             rank=local_rank,
             use_usp=args.use_usp,
             offload=args.offload,
-            quant=args.quant,
         )
         input_data = {
             "prompt": args.prompt,
