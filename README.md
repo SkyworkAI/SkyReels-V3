@@ -144,9 +144,11 @@ torchrun --nproc_per_node=4 generate_video.py --task_type shot_switching_extensi
 The Talking Avatar model generates vibrant, lifelike talking avatars from a single portrait image and an audio clip, supporting videos of up to 200 seconds in length. It is capable of producing multi-avatar scenes, adapting to diverse artistic styles, and delivering performances with rich expressiveness and precise synchronization.
 - Single-GPU inference
 ```bash
+torchrun --nproc_per_node=1 generate_video.py --task_type talking_avatar --prompt "A young girl's eyes kept following the camera, singing with a mysterious expression. Surrounded by rich blooming florals, the camera cranes up slowly to reveal the full surreal, luxurious scene." --seed 42 --offload --input_image "https://skyreels-api.oss-accelerate.aliyuncs.com/examples/talking_avatar_video/single1.png" --input_audio "https://skyreels-api.oss-accelerate.aliyuncs.com/examples/talking_avatar_video/single_actor/huahai_5s.mp3"
 ```
 - Multi-GPU inference using xDiT USP
 ```bash
+torchrun --nproc_per_node=4 generate_video.py --task_type talking_avatar --prompt "A young girl's eyes kept following the camera, singing with a mysterious expression. Surrounded by rich blooming florals, the camera cranes up slowly to reveal the full surreal, luxurious scene." --seed 42 --use_usp --offload --input_image "https://skyreels-api.oss-accelerate.aliyuncs.com/examples/talking_avatar_video/single1.png" --input_audio "https://skyreels-api.oss-accelerate.aliyuncs.com/examples/talking_avatar_video/single_actor/huahai_5s.mp3"
 ```
 
 ## Introduction of SkyReels-V3
