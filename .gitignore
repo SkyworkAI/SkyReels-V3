@@ -150,8 +150,14 @@ cython_debug/
 *.swp
 *.swo
 
+# Output
 bak/
 result/
 *.mp4
+*.pt
+*.wav
+*.png
+*.mp3
+
 
 video_extension_model
