@@ -240,7 +240,6 @@ def optimized_transform_before(x, N_t):
     # x = rearrange(x, "B (N_t S) C -> (B N_t) S C", N_t=N_t)
     S = x.shape[1] // N_t
     x = x.reshape(x.shape[0] * N_t, S, x.shape[2])
-    # chunk数据
     x = torch.chunk(x, get_sequence_parallel_world_size(), dim=1)[get_sequence_parallel_rank()]
     return x
 
@@ -250,7 +249,6 @@ def optimized_gather_after(x: torch.Tensor, N_t: int) -> torch.Tensor:
     # x = rearrange(x, "(B N_t) S C -> B (N_t S) C", N_t=N_t)
     B = x.shape[0] // N_t
     x = x.reshape(B, N_t * x.shape[1], x.shape[2])
-    # chunk数据
     x = torch.chunk(x, get_sequence_parallel_world_size(), dim=1)[get_sequence_parallel_rank()]
 
     return x
@@ -265,31 +263,23 @@ def usp_crossattn_multi_forward_avatar(
     human_num=None,
     enable_sp=True,
 ) -> torch.Tensor:
-    # 方案二，输入输出都需要进行一次all gather
     N_t = shape[0]
     x = optimized_transform_before(x, N_t)
     x = x if x.is_contiguous() else x.contiguous()
 
-    # 3) 对 x_ref_attn_map 应用与 x 同样的变换，保证 token 对齐
-    #    x_ref_attn_map: [H, L_local]（自注意生成时已按 SP 切过）
     sp_size = get_sequence_parallel_world_size()
     sp_rank = get_sequence_parallel_rank()
     if x_ref_attn_map is not None:
-        # 先聚合成全局序列
         x_ref_attn_map = get_sp_group().all_gather(
             x_ref_attn_map.to(torch.bfloat16).contiguous(), dim=1
         )  # -> [H, L_global]
-        # 依帧重排：L_global = N_t * S_per_frame
         S_per_frame = x_ref_attn_map.shape[1] // N_t
         x_ref_attn_map = x_ref_attn_map.view(x_ref_attn_map.shape[0], N_t, S_per_frame)
-        # 按 S 维切分并取本 rank
         x_ref_attn_map = torch.chunk(x_ref_attn_map, sp_size, dim=2)[sp_rank]  # -> [H, N_t, S_per_frame/sp_size]
-        # 扁平回 [H, N_t * S_local]
         x_ref_attn_map = x_ref_attn_map.reshape(x_ref_attn_map.shape[0], -1).type_as(x)
 
     x = self.origin_forward(
         x, encoder_hidden_states, shape=shape, x_ref_attn_map=x_ref_attn_map, enable_sp=enable_sp, human_num=human_num
     )
-    # allreduce结果
     x = optimized_gather_after(x, N_t)
     return x

@@ -274,10 +274,11 @@ if __name__ == "__main__":
         current_time = time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime())
         video_out_file = f"{args.seed}_{current_time}.mp4"
         output_path = os.path.join(save_dir, video_out_file)
+        fps = 25 if args.task_type == "talking_avatar" else 24
         imageio.mimwrite(
             output_path,
             video_out,
-            fps=24,
+            fps=fps,
             quality=8,
             output_params=["-loglevel", "error"],
         )
@@ -311,6 +312,7 @@ if __name__ == "__main__":
                     stderr=subprocess.STDOUT,
                 )
                 print(f"Video with audio generated successfully: {video_with_audio_path}")
+                os.remove(video_in) # remove the original video
             except subprocess.CalledProcessError as e:
                 print(f"ffmpeg failed (exit={e.returncode}). Output:\n{e.stdout}")
 

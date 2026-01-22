@@ -276,7 +276,6 @@ class TalkingAvatarPipeline:
             full_audio_embs.append(full_audio_emb)
 
         assert len(full_audio_embs) == HUMAN_NUMBER, f"Aduio file not exists or length not satisfies frame nums."
-        print("audio embeds size: ", full_audio_embs[0].size())
 
         # preprocess text embedding
         if n_prompt == "":
@@ -386,13 +385,8 @@ class TalkingAvatarPipeline:
                 target_w,
             ).to(self.device)
             padding_frames_pixels_values = torch.concat([cond_image, video_frames], dim=2)
-            print(
-                f"cond_image:{cond_image.size()}, video_frames:{video_frames.size()}",
-            )
 
-            print(f"vae encode: padding_frames_pixels_values: {padding_frames_pixels_values.shape}")
             y = self.vae.encode(padding_frames_pixels_values).to(self.param_dtype)
-            print(f"vae encode: y: {y.shape}")
             cur_motion_frames_latent_num = int(1 + (cur_motion_frames_num - 1) // 4)
             latent_motion_frames = y[:, :, :cur_motion_frames_latent_num][0]
             y = torch.concat([msk, y], dim=1)  # B 4+C T H W
@@ -543,9 +537,7 @@ class TalkingAvatarPipeline:
                 self.model.to("cpu")
                 torch.cuda.empty_cache()
 
-            print(f"vae decode: x0: {x0[0].shape}")
             videos = self.vae.decode(x0[0])
-            print(f"vae decode: videos: {videos.shape}")
             torch.cuda.empty_cache()
 
         # cache generated samples
