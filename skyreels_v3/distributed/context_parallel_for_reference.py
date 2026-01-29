@@ -138,6 +138,7 @@ def parallelize_transformer(pipe: DiffusionPipeline):
         encoder_hidden_states_image: Optional[torch.Tensor] = None,
         return_dict: bool = True,
         attention_kwargs: Optional[Dict[str, Any]] = None,
+        block_offload: bool = False,
     ) -> Union[torch.Tensor, Dict[str, torch.Tensor]]:
         if attention_kwargs is not None:
             lora_scale = attention_kwargs.pop("scale", 1.0)
