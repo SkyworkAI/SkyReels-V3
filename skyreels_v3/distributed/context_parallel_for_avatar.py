@@ -56,6 +56,7 @@ def usp_dit_forward_avatar(
     audio=None,
     ref_target_masks=None,
     audio_mask=None,
+    block_offload: bool = False,
 ):
     """
     x:              A list of videos each with shape [C, T, H, W].

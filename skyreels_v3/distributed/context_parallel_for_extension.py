@@ -225,6 +225,7 @@ def usp_dit_forward(
     y=None,
     block_mask=None,
     context_window_size=0,
+    block_offload: bool = False,
 ):
     """
     USP (Unified Sequence Parallel) DiT forward.
