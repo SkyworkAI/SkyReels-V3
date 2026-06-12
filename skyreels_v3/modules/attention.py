@@ -2,10 +2,10 @@
 import torch
 
 try:
-    import flash_attn_interface
+    from flash_attn import flash_attn_interface
 
     FLASH_ATTN_3_AVAILABLE = True
-except ModuleNotFoundError:
+except (ModuleNotFoundError, ImportError):
     FLASH_ATTN_3_AVAILABLE = False
 
 try:
@@ -91,46 +91,74 @@ def flash_attention(
         f"{list(q.shape)}-{list(k.shape)}-{list(v.shape)}-{q.dtype}-{k.dtype}-{v.dtype}"
     )
     # apply attention
+    # NOTE: flash-attn >= 2.5.9 changed the default return type from Tuple to Tensor.
+    # Use _extract_output() to handle both old and new API.
+    def _extract_output(result):
+        """兼容处理: tuple 取第一个元素, tensor 直接返回"""
+        if isinstance(result, tuple):
+            return result[0]
+        return result
+
+    fa_success = False
     if (version is None or version == 3) and FLASH_ATTN_3_AVAILABLE:
         # Note: dropout_p, window_size are not supported in FA3 now.
-        x = flash_attn_interface.flash_attn_varlen_func(
-            q=q,
-            k=k,
-            v=v,
-            cu_seqlens_q=torch.cat([q_lens.new_zeros([1]), q_lens])
-            .cumsum(0, dtype=torch.int32)
-            .to(q.device, non_blocking=True),
-            cu_seqlens_k=torch.cat([k_lens.new_zeros([1]), k_lens])
-            .cumsum(0, dtype=torch.int32)
-            .to(q.device, non_blocking=True),
-            seqused_q=None,
-            seqused_k=None,
-            max_seqlen_q=lq,
-            max_seqlen_k=lk,
-            softmax_scale=softmax_scale,
-            causal=causal,
-            deterministic=deterministic,
-        )[0].unflatten(0, (b, lq))
-    else:
-        assert FLASH_ATTN_2_AVAILABLE
-        x = flash_attn.flash_attn_varlen_func(
-            q=q,
-            k=k,
-            v=v,
-            cu_seqlens_q=torch.cat([q_lens.new_zeros([1]), q_lens])
-            .cumsum(0, dtype=torch.int32)
-            .to(q.device, non_blocking=True),
-            cu_seqlens_k=torch.cat([k_lens.new_zeros([1]), k_lens])
-            .cumsum(0, dtype=torch.int32)
-            .to(q.device, non_blocking=True),
-            max_seqlen_q=lq,
-            max_seqlen_k=lk,
-            dropout_p=dropout_p,
-            softmax_scale=softmax_scale,
-            causal=causal,
-            window_size=window_size,
-            deterministic=deterministic,
-        ).unflatten(0, (b, lq))
+        try:
+            result = flash_attn_interface.flash_attn_varlen_func(
+                q=q,
+                k=k,
+                v=v,
+                cu_seqlens_q=torch.cat([q_lens.new_zeros([1]), q_lens])
+                .cumsum(0, dtype=torch.int32)
+                .to(q.device, non_blocking=True),
+                cu_seqlens_k=torch.cat([k_lens.new_zeros([1]), k_lens])
+                .cumsum(0, dtype=torch.int32)
+                .to(q.device, non_blocking=True),
+                max_seqlen_q=lq,
+                max_seqlen_k=lk,
+                softmax_scale=softmax_scale,
+                causal=causal,
+                deterministic=deterministic,
+            )
+            x = _extract_output(result).unflatten(0, (b, lq))
+            fa_success = True
+        except Exception as e:
+            warnings.warn(f"FlashAttention 3 failed: {e}. Falling back to FlashAttention 2 / PyTorch.")
+
+    if not fa_success and FLASH_ATTN_2_AVAILABLE:
+        try:
+            result = flash_attn.flash_attn_varlen_func(
+                q=q,
+                k=k,
+                v=v,
+                cu_seqlens_q=torch.cat([q_lens.new_zeros([1]), q_lens])
+                .cumsum(0, dtype=torch.int32)
+                .to(q.device, non_blocking=True),
+                cu_seqlens_k=torch.cat([k_lens.new_zeros([1]), k_lens])
+                .cumsum(0, dtype=torch.int32)
+                .to(q.device, non_blocking=True),
+                max_seqlen_q=lq,
+                max_seqlen_k=lk,
+                dropout_p=dropout_p,
+                softmax_scale=softmax_scale,
+                causal=causal,
+                window_size=window_size,
+                deterministic=deterministic,
+            )
+            x = _extract_output(result).unflatten(0, (b, lq))
+            fa_success = True
+        except Exception as e:
+            warnings.warn(f"FlashAttention 2 failed: {e}. Falling back to PyTorch native attention.")
+
+    if not fa_success:
+        # Fall back to PyTorch native scaled_dot_product_attention
+        warnings.warn("Using PyTorch native scaled_dot_product_attention as fallback.")
+        q_orig = q.unflatten(0, (b, lq)).transpose(1, 2)
+        k_orig = k.unflatten(0, (b, lk)).transpose(1, 2)
+        v_orig = v.unflatten(0, (b, lk)).transpose(1, 2)
+        x = torch.nn.functional.scaled_dot_product_attention(
+            q_orig, k_orig, v_orig, attn_mask=None, is_causal=causal, dropout_p=dropout_p
+        ).transpose(1, 2).contiguous()
+
     torch.cuda.nvtx.range_pop()
 
     # output
