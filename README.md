@@ -1,4 +1,4 @@
-<p align="center">
+<img<p align="center">
   <img src="assets/logo2.png" alt="SkyReels Logo" width="50%">
 </p>
 
