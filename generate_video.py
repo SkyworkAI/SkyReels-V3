@@ -3,6 +3,7 @@ import logging
 import os
 import random
 import time
+from urllib.parse import urlsplit
 
 # 配置日志格式和级别，实现实时终端打印
 logging.basicConfig(
@@ -41,7 +42,10 @@ def maybe_download(path_or_url: str, save_dir: str) -> str:
         return path_or_url
 
     url = path_or_url
-    filename = url.split("/")[-1]
+    parsed_url = urlsplit(url)
+    filename = os.path.basename(parsed_url.path)
+    if parsed_url.scheme not in {"http", "https"} or not parsed_url.netloc or filename in {"", ".", ".."}:
+        raise ValueError(f"Expected an existing file or an HTTP(S) URL with a filename: {path_or_url!r}")
     local_path = os.path.join(save_dir, filename)
     logging.info(f"downloading input: {local_path}")
     os.makedirs(os.path.dirname(local_path), exist_ok=True)
